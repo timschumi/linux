@@ -244,6 +244,8 @@ int bcm_hsotgctrl_phy_init(bool id_device)
 
 	msleep(HSOTGCTRL_ID_CHANGE_DELAY_IN_MS);
 
+	bcm_hsotgctrl_bc_enable_sw_ovwr();
+	
 	return 0;
 
 }

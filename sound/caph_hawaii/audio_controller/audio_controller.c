@@ -533,6 +533,7 @@ void AUDCTRL_Telephony_RateChange(unsigned int sample_rate)
 	AudioApp_t pre_app, app;
 	AudioMode_t mode;
 	int bNeedDualMic;
+	int bTempmuteVoiceCall = bmuteVoiceCall;
 #ifdef CONFIG_ENABLE_VOIF
 	VoIF_CallType_t callType = VOIF_NO_CALL;
 #endif
@@ -566,6 +567,11 @@ void AUDCTRL_Telephony_RateChange(unsigned int sample_rate)
 
 		bNeedDualMic = needDualMic(mode, app);
 
+		AUDCTRL_SetTelephonySpkrMute(AUDIO_SINK_UNDEFINED, 1);
+		wait_before_pmu_off = DELAY_BEFORE_PMU_OFF;
+		AUDCTRL_SetTelephonyMicMute(AUDIO_SOURCE_UNDEFINED, 1);
+		powerOnExternalAmp(voiceCallSpkr, TelephonyUse, FALSE, FALSE);
+		wait_before_pmu_off = 0;
 #ifdef CONFIG_ENABLE_VOIF
 		if (app == AUDIO_APP_VT_CALL)
 			callType = VOIF_VT_CALL_NB;
@@ -583,6 +589,10 @@ void AUDCTRL_Telephony_RateChange(unsigned int sample_rate)
 		AUDCTRL_Telephony_HW_16K(mode);
 		AUDDRV_Telephony_RateChange(mode, app, bNeedDualMic,
 						bmuteVoiceCall);
+		powerOnExternalAmp(voiceCallSpkr, TelephonyUse, TRUE, FALSE);
+		if (!bTempmuteVoiceCall)
+			AUDCTRL_SetTelephonyMicMute(AUDIO_SOURCE_UNDEFINED, 0);
+		AUDCTRL_SetTelephonySpkrMute(AUDIO_SINK_UNDEFINED, 0);
 	}
 }
 

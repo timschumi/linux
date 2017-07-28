@@ -352,7 +352,7 @@ config GPS_IRQ
 
 config BCM_RTC_CAL
 	tristate "RTC CAL"
-	depends on BCM_MODEM && (ARCH_RHEA)
+	depends on BCM_MODEM && (ARCH_RHEA || ARCH_HAWAII)
 	default n
 	---help---
 	Select to build the RTC CAL driver.

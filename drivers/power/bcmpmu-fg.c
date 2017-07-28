@@ -369,7 +369,7 @@ static void bcmpmu_fg_reset_adj_factors(struct bcmpmu_fg_data *fg);
 static void bcmpmu_fg_update_psy(struct bcmpmu_fg_data *fg, bool force_update);
 static int bcmpmu_fg_get_curr_inst(struct bcmpmu_fg_data *fg);
 static int bcmpmu_fg_freeze_read(struct bcmpmu_fg_data *fg);
-
+extern int get_spa_chg_status();
 
 /**
  * inline function
@@ -2525,7 +2525,6 @@ static void bcmpmu_fg_discharging_algo(struct bcmpmu_fg_data *fg)
 			 * disable coulomb counter. Now we will rely on
 			 * cutoff voltage table for capacity
 			 */
-			bcmpmu_fg_enable_coulb_counter(fg, false);
 			fg->discharge_state = DISCHARG_STATE_CRIT_BATT;
 			poll_time = fg->pdata->poll_rate_crit_batt;
 			config_tapper = true;
@@ -2556,8 +2555,11 @@ static void bcmpmu_fg_discharging_algo(struct bcmpmu_fg_data *fg)
 			config_tapper = true;
 			break;
 		}
-		if ((cap_cutoff >= 0) && (fg->crit_cutoff_cap < 0))
+		if ((cap_cutoff >= 0) && (fg->crit_cutoff_cap < 0)) {
+			if(!fg->flags.coulb_dis)
+				bcmpmu_fg_enable_coulb_counter(fg, false);			
 			fg->crit_cutoff_cap = cap_cutoff;
+		}			
 
 		if ((cap_cutoff >= 0) &&
 				(cap_cutoff == fg->crit_cutoff_cap) &&
@@ -2651,6 +2653,10 @@ static void bcmpmu_fg_periodic_work(struct work_struct *work)
 #endif
 		return;
 	}
+
+	if(get_spa_chg_status())
+		fg->flags.batt_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	
 
 	if (fg->flags.init_capacity) {
 		fg->capacity_info.initial = bcmpmu_fg_get_init_cap(fg);

@@ -583,6 +583,8 @@ static int __devinit bcm_keypad_probe(struct platform_device *pdev)
 	chal_keypad_set_pullup_mode(keypadHandle, hwConfig.pullUpMode);
 	chal_keypad_set_column_filter(keypadHandle, TRUE,
 				      hwConfig.debounceTime);
+	chal_keypad_set_status_filter(keypadHandle, TRUE,
+				      hwConfig.debounceTime);
 	chal_keypad_set_row_width(keypadHandle, hwConfig.rows);
 	chal_keypad_set_column_width(keypadHandle, hwConfig.columns);
 #ifdef SWAP_ROW_COL

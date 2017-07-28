@@ -195,7 +195,9 @@ static struct device_attribute spa_power_attrs[]=
 #define POWER_SUPPLY_USB "usb"
 
 
-static struct spa_power_desc *g_spa_power;
+
+
+static struct spa_power_desc *g_spa_power=NULL;
 
 static int spa_set_charge(struct spa_power_desc *spa_power_iter, unsigned int act);
 static int spa_get_charger_type(struct spa_power_desc *spa_power_iter);
@@ -212,6 +214,26 @@ static void spa_update_power_supply_battery(struct spa_power_desc *spa_power_ite
 static void spa_stop_charge_timer(SPA_CHARGING_STATUS_T endtype, void *data);
 static int spa_start_charge_timer(charge_timer_t duration, void *data);
 static int spa_do_status(struct spa_power_desc *spa_power_iter, unsigned char machine, unsigned int phase, unsigned status);
+
+int get_spa_chg_status()
+{
+	struct spa_power_desc *spa_power_iter;
+
+	if(g_spa_power==NULL) 
+		return 0;
+	
+	spa_power_iter = g_spa_power;
+
+	if( spa_power_iter->charging_status.status == SPA_STATUS_SUSPEND_TEMP_COLD || spa_power_iter->charging_status.status == SPA_STATUS_SUSPEND_TEMP_HOT)
+		if( spa_power_iter->charging_status.phase ==POWER_SUPPLY_STATUS_NOT_CHARGING)
+		{
+			printk("%s : change [FG] batt_status to discharg\n",__func__);
+			return 1;
+		}
+
+	return 0;	
+}
+
 
 #if defined(SPA_DEBUG_FEATURE)
 // ++ device attribute
@@ -1104,14 +1126,7 @@ static int spa_do_status(struct spa_power_desc *spa_power_iter, unsigned char ma
 			else if(status == SPA_STATUS_VF_INVALID)
 			{
 				spa_power_iter->charging_status.status = SPA_STATUS_VF_INVALID;
-				if(spa_power_iter->lp_charging)
-				{
-					spa_power_iter->batt_info.health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-				}
-				else
-				{
-					spa_power_iter->batt_info.health = POWER_SUPPLY_HEALTH_DEAD;
-				}
+				spa_power_iter->batt_info.health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
 			}
 
 			spa_stop_charge_timer(spa_power_iter->charging_status, spa_power_iter);
@@ -1294,10 +1309,6 @@ static void spa_update_batt_info(struct spa_power_desc *spa_power_iter, unsigned
 				   }
 				   */
 			}
-			if(spa_power_iter->charger_info.charger_type != POWER_SUPPLY_TYPE_BATTERY && spa_power_iter->batt_info.vf_status == 0 )
-			{ // batterry removed
-				value.intval = 0;
-			}			
 			pr_spa_dbg(LEVEL1, "%s : capacity = %d\n notified capacity=%d\n", __func__, spa_power_iter->batt_info.capacity, value.intval);
 			ps->set_property(ps, POWER_SUPPLY_PROP_CAPACITY, &value);
 			break;
@@ -1672,7 +1683,7 @@ int spa_event_handler(int evt, void *data)
 			break;
 	}
 	cancel_delayed_work_sync(&spa_power_iter->battery_work);
-	schedule_delayed_work(&spa_power_iter->battery_work, msecs_to_jiffies(0));
+	schedule_delayed_work(&spa_power_iter->battery_work, msecs_to_jiffies(400));
 	pr_spa_dbg(LEVEL4, "%s : leave \n", __func__);
 	return 0;
 }

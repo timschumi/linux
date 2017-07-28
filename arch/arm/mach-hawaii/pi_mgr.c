@@ -176,17 +176,17 @@ static int mm_pi_enable(struct pi *pi, int enable)
 			clk_enable(ref_8ph_en_pll1_clk);
 	}
 #endif
-
-#ifdef CONFIG_MM_FREEZE_VAR500M_ERRATUM
-	if (is_pm_erratum(ERRATUM_MM_FREEZE_VAR500M) && enable)
-		var500m_clk_en_override(true);
-#endif
+//
+//#ifdef CONFIG_MM_FREEZE_VAR500M_ERRATUM
+//	if (is_pm_erratum(ERRATUM_MM_FREEZE_VAR500M) && enable)
+//		var500m_clk_en_override(true);
+//#endif
 	ret = gen_pi_ops.enable(pi, enable);
 
-#ifdef CONFIG_MM_FREEZE_VAR500M_ERRATUM
-	if (is_pm_erratum(ERRATUM_MM_FREEZE_VAR500M) && !enable)
-		var500m_clk_en_override(false);
-#endif
+//#ifdef CONFIG_MM_FREEZE_VAR500M_ERRATUM
+//	if (is_pm_erratum(ERRATUM_MM_FREEZE_VAR500M) && !enable)
+//		var500m_clk_en_override(false);
+//#endif
 
 #ifdef CONFIG_PLL1_8PHASE_OFF_ERRATUM
 	if (is_pm_erratum(ERRATUM_PLL1_8PHASE_OFF)) {
@@ -239,7 +239,7 @@ struct pi_opp mm_opp = {
 
 static struct pi_state mm_states[] = {
 	PI_STATE(PI_STATE_ACTIVE, RUN_POLICY, 0, 0),
-	PI_STATE(PI_STATE_RETENTION, RETN_POLICY, 10, 0),
+	// PI_STATE(PI_STATE_RETENTION, RETN_POLICY, 10, 0),
 	PI_STATE(PI_STATE_SHUTDOWN, SHTDWN_POLICY, 100, PI_STATE_SAVE_CONTEXT),
 };
 

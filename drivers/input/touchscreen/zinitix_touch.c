@@ -1776,7 +1776,7 @@ retry_init:
 		ZINITIX_INT_ENABLE_FLAG,
 		touch_dev->cap_info.ic_int_mask) != I2C_SUCCESS)
 		goto fail_init;
-
+	mdelay(20);
 	zinitix_bit_set(touch_dev->cap_info.internal_flag_02, 6);
 	if (ts_write_reg(touch_dev->client,ZINITIX_INTERNAL_FLAG_02, 
 		touch_dev->cap_info.internal_flag_02) != I2C_SUCCESS)	

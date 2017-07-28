@@ -44,6 +44,7 @@
 #define DIS_ADCCHG_MASK()
 #endif
 
+static bool init_reg_setting(void);
 
 static struct rt8973_data* pDrvData = NULL; /*driver data*/
 static struct platform_device *rtmus_dev = NULL; /* Device structure */
@@ -67,7 +68,7 @@ static char *devices_name[] = { "NONE",
 								"OTG",
 								};
 static int32_t DCDT_retry = 0;
-
+static int32_t I2C_retry = 10;
 
 #define I2C_RW_RETRY_MAX 2
 #define I2C_RW_RETRY_DELAY 20
@@ -805,9 +806,13 @@ inline void do_detach_work(int32_t regIntFlag)
 			regCtrl1 |= 0x04; // Automatically Contrl
 			I2CWByte(RT8973_REG_CONTROL_1,regCtrl1);
 		}
+		break;
 	default:
 		INFO("Unknown accessory detach\n");
-		;
+		pDrvData->accessory_id = ID_NONE;
+		pDrvData->factory_mode = RTMUSC_FM_NONE;
+		DCDT_retry = 0;		
+		return;
 	}
 
 	pDrvData->accessory_id = ID_NONE;
@@ -823,17 +828,49 @@ inline void do_detach_work(int32_t regIntFlag)
 
 static irqreturn_t rt8973musc_irq_handler(int irq, void *data);
 
+
+int rt8973musc_insert_error_check(int32_t regIntFlag)
+{
+	int32_t i;
+	int32_t error_cnt=0;
+	for(i=0; i<8; i++)
+	{
+		((regIntFlag >> i) & 0x01) == 0x01? error_cnt++: error_cnt;
+	}
+	return error_cnt;
+}
+
+
 static void rt8973musc_work(struct work_struct *work)
 {
-	int32_t regIntFlag;
+	int32_t regIntFlag,i;
 	int32_t regIntFlag2;
+	int32_t regIntFlag_check;
 	int32_t regADC;
 	int32_t regDev1, regDev2;
+	int32_t error_cnt = 0;
 	struct i2c_client *pClient = pDrvData->client;
 	struct rtmus_platform_data *pdata = &platform_data;
 
+        msleep(100);
 	regIntFlag = I2CRByte(RT8973_REG_INT_FLAG);
-	INFO("Interrupt Flag = 0x%x\n", regIntFlag);
+	regIntFlag_check =  I2CRByte(RT8973_REG_INT_FLAG);
+	error_cnt = rt8973musc_insert_error_check(regIntFlag);
+	
+	if( regIntFlag < 0 || error_cnt  >= 4 || regIntFlag_check&(RT8973_INT_ATTACH_MASK|RT8973_INT_DETACH_MASK))
+	{
+		printk("rt8973 : try to read reg INT again, regIntFlag = 0x%x error_cnt=%d regIntFlag_check = 0x%x\n",regIntFlag,error_cnt,regIntFlag_check);	
+		for( i=0; i<I2C_retry; i++)
+		{
+			msleep(20);
+			regIntFlag = I2CRByte(RT8973_REG_INT_FLAG);
+			error_cnt = rt8973musc_insert_error_check(regIntFlag);
+			printk("rt8973 : try to read reg INT again, regIntFlag = 0x%x error_cnt=%d \n",regIntFlag,error_cnt);	
+			if( regIntFlag>=0 && error_cnt < 4)
+				break;
+		}
+	}
+	INFO("Interrupt Flag = 0x%x error_cnt=%d regIntFlag_check=0x%x\n", regIntFlag,error_cnt,regIntFlag_check);
 	if (regIntFlag&RT8973_INT_ATTACH_MASK) {
 		regDev1 = I2CRByte(RT8973_REG_DEVICE_1);
 		regDev2 = I2CRByte(RT8973_REG_DEVICE_2);
@@ -841,8 +878,8 @@ static void rt8973musc_work(struct work_struct *work)
 			INFO("There is un-handled event!!\n");
 			if (regDev1 == 0 && regDev2 == 0)
 				do_detach_work(regIntFlag);
-			else
-				do_attach_work(regIntFlag, regDev1, regDev2);
+			init_reg_setting(); // reset RT8973 to let it release INT-pin
+			return;
 		} else {
 			do_attach_work(regIntFlag, regDev1, regDev2);
 		}
@@ -931,9 +968,14 @@ static bool init_reg_setting(void)
 	regCtrl1 = I2CRByte(RT8973_REG_CONTROL_1);
 	INFO("reg_ctrl1 = 0x%x\n", regCtrl1);
 	if (regCtrl1 != 0xe5 && regCtrl1 != 0xc5) {
-		ERR("Reg Ctrl 1 != 0xE5 or 0xC5\n");
-		return false;
-	}
+		printk("rt8973 : try to read regCtrl1 again\n");	
+		 msleep(RT8973_WAIT_DELAY);		
+		 regCtrl1 = I2CRByte(RT8973_REG_CONTROL_1);		
+		 if (regCtrl1!=0xe5 && regCtrl1!=0xc5) {		
+			 ERR("Reg Ctrl 1 != 0xE5 or 0xC5 (0x%x)\n", regCtrl1);		
+			 return false;	
+		 }
+    }
 	if (pDrvData->operating_mode != 0) {
 		regCtrl1 &= (~0x04);
 		I2CWByte(RT8973_REG_CONTROL_1, regCtrl1);

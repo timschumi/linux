@@ -2323,12 +2323,12 @@ const regs_t s5k4ecgx_init_regs[]
 //System Clock & Output clock (Pclk)	
 	
 0x002A021A,	
-0x0F123A98,	//REG_TC_IPRM_OpClk4KHz_0 
-0x0F12280A, 	//REG_TC_IPRM_MinOutRate4KHz_0
-0x0F1236B0, 	//REG_TC_IPRM_MaxOutRate4KHz_0	
-0x0F124F1A,	//REG_TC_IPRM_OpClk4KHz_1 
-0x0F12280A, 	//REG_TC_IPRM_MinOutRate4KHz_1
-0x0F1236B0, 	//REG_TC_IPRM_MaxOutRate4KHz_1	
+0x0F122A81,	//REG_TC_IPRM_OpClk4KHz_0
+0x0F1227AC, //REG_TC_IPRM_MinOutRate4KHz_0
+0x0F1227AD, //REG_TC_IPRM_MaxOutRate4KHz_0
+0x0F124F58,	//REG_TC_IPRM_OpClk4KHz_1
+0x0F1227AC, //REG_TC_IPRM_MinOutRate4KHz_1
+0x0F1227AD, //REG_TC_IPRM_MaxOutRate4KHz_1
 
 0x002A022C,                                               
 0x0F120001,//REG_TC_IPRM_InitParamsUpdated
@@ -3383,8 +3383,8 @@ const regs_t s5k4ecgx_init_regs[]
 0x0F120500,	//REG_0TC_PCFG_usWidth  //Hsize   : 640		
 0x0F1203C0,	//REG_0TC_PCFG_usHeight//Vsize   : 480  
 0x0F120005,	//REG_0TC_PCFG_Format	  05 : yuv 07: raw 09 : jpeg             
-0x0F1236B0,	//REG_0TC_PCFG_usMaxOut4KHzRate     	
-0x0F12280A,	//REG_0TC_PCFG_usMinOut4KHzRate     	
+0x0F1227AD, //REG_0TC_PCFG_usMaxOut4KHzRate
+0x0F1227AC, //REG_0TC_PCFG_usMinOut4KHzRate
 0x0F120100,	//REG_0TC_PCFG_OutClkPerPix88       	
 0x0F120300,	//REG_0TC_PCFG_uBpp88               	
 0x0F120012,	//REG_0TC_PCFG_PVIMask      soc raw : c2 raw 52         	
@@ -3411,8 +3411,8 @@ const regs_t s5k4ecgx_init_regs[]
 0x0F120A00,	//REG_0TC_CCFG_usWidth              
 0x0F120780,	//REG_0TC_CCFG_usHeight             
 0x0F120005,	//REG_0TC_CCFG_Format               
-0x0F1236B0,	//REG_0TC_CCFG_usMaxOut4KHzRate     
-0x0F12280A,	//REG_0TC_CCFG_usMinOut4KHzRate     
+0x0F1227AD, //REG_0TC_CCFG_usMaxOut4KHzRate
+0x0F1227AC, //REG_0TC_CCFG_usMinOut4KHzRate
 0x0F120100,	//REG_0TC_CCFG_OutClkPerPix88       
 0x0F120300,	//REG_0TC_CCFG_uBpp88               
 0x0F120012,	//REG_0TC_CCFG_PVIMask              
@@ -3629,8 +3629,6 @@ const regs_t s5k4ecgx_wb_auto_regs[] =  //WB?�정
 {
 0xFCFCD000,
 0x00287000,
-0x002A04E6,
-0x0F12077F,
 };
 
 //const regs_t s5k4ecgx_wb_sunny_regs[] =
@@ -3639,8 +3637,6 @@ const regs_t s5k4ecgx_wb_daylight_regs[] =//?�정
 
 	0xFCFCD000,
 	0x00287000,
-	0x002A04E6,
-	0x0F120777,
   
   0x002A04BA, //R gain
   0x0F120568,
@@ -3659,9 +3655,6 @@ const regs_t s5k4ecgx_wb_cloudy_regs[] =//?�정
 {
   0xFCFCD000,
   0x00287000,	
-  0x002A04E6,	
-  0x0F120777,
-
 
   0x002A04BA,  //R gain                       
   0x0F120610,                                
@@ -3680,9 +3673,6 @@ const regs_t s5k4ecgx_wb_incandescent_regs[] = //?�정
 {
   0xFCFCD000,
   0x00287000,
-  0x002A04E6,
-  0x0F120777,
-
 
   0x002A04BA,
   0x0F1203D0,
@@ -5480,7 +5470,7 @@ const regs_t s5k4ecgx_HD_Camcorder_regs[] =
 0x0F121A02,		/*70000A18 _yuviirnr_iYNRStrengthH   */  
 0x0F128018,		/*70000A1A _yuviirnr_iUVNRStrengthH   */ 
 0x0F1200B0,		/*70000A1C _RGBGamma2_iLinearity   */    
-0x0F120380,		/*70000A1E _ccm_oscar_iSaturation   */   
+0x0F120080,		/*70000A1E _ccm_oscar_iSaturation   */
 0x0F120180,		/*70000A20 _RGB2YUV_iRGBGain   */        
 0x0F120A0A,		/*70000A22 _bnr_iClustMulT_H   */        
 0x0F120101,		/*70000A24 _bnr_iClustThresh_H   */      
@@ -5571,7 +5561,7 @@ const regs_t s5k4ecgx_HD_Camcorder_regs[] =
 0x0F121A02,		/*70000ACE _yuviirnr_iYNRStrengthH   */  
 0x0F128018,		/*70000AD0 _yuviirnr_iUVNRStrengthH   */ 
 0x0F1200A0,		/*70000AD2 _RGBGamma2_iLinearity   */    
-0x0F120380,		/*70000AD4 _ccm_oscar_iSaturation   */   
+0x0F120080,		/*70000AD4 _ccm_oscar_iSaturation   */
 0x0F120180,		/*70000AD6 _RGB2YUV_iRGBGain   */        
 0x0F120A0A,		/*70000AD8 _bnr_iClustMulT_H   */        
 0x0F120101,		/*70000ADA _bnr_iClustThresh_H   */      
@@ -5863,9 +5853,11 @@ const regs_t s5k4ecgx_HD_Camcorder_regs[] =
 0x0F120008,		/*70000D16 _ee_iReduceEdgeSlope_Bin */   
 0x0F120001,		/*70000D18 _bnr_nClustLevel_C      */    
 
+0x002A060C,
+0x0F120300,	/*lt_ExpGain_ExpCurveGainMaxStr*/
 /* FOR HD CAMCORDER */
 
-0x002A02AB,
+0x002A02AA,
 0x0F120006,	//5	//REG_0TC_PCFG_Format	  05 : yuv (0~255)  06:yuv (16~234) 07: raw 09 : jpeg  
 
 0x002A0266,
@@ -5897,6 +5889,286 @@ const regs_t s5k4ecgx_HD_Camcorder_Disable_regs[] =
 0x0F1205C0,	/*senHal_uMinColsBin        */
 0x0F1205C0,	/*senHal_uMinColsNoBin      */
 	
+0x002A1484,
+0x0F12003C,
+
+// AE Weight (Normal)
+0x002A1492,
+0x0F120101,
+0x0F120101,
+0x0F120101,
+0x0F120101,
+
+0x0F120101,
+0x0F120202,
+0x0F120202,
+0x0F120101,
+
+0x0F120201,
+0x0F120202,
+0x0F120202,
+0x0F120102,
+
+0x0F120201,
+0x0F120302,
+0x0F120203,
+0x0F120102,
+
+0x0F120201,
+0x0F120302,
+0x0F120203,
+0x0F120102,
+
+0x0F120101,
+0x0F120202,
+0x0F120202,
+0x0F120101,
+
+0x0F120101,
+0x0F120201,
+0x0F120102,
+0x0F120101,
+
+0x0F120100,
+0x0F120101,
+0x0F120101,
+0x0F120001,
+
+/* SLOW AE*/
+0x002A1568,
+0x0F120010,
+0x0F120020,
+0x0F120040,
+0x0F120080,
+0x0F120100,
+0x0F120200,
+0x0F120400,
+0x0F120800,
+0x0F120800,
+
+0x0F120010,
+0x0F120020,
+0x0F120040,
+0x0F120080,
+0x0F120100,
+0x0F120200,
+0x0F120400,
+0x0F120800,
+0x0F122000,
+
+0x002A0544,
+0x0F120111, // limit high
+0x0F1200EF, // limit low
+
+0x002A0588,
+0x0F120002, //lt_uInitPostToleranceCnt//
+0x002A0582,
+0x0F120000, // speed
+0x002A47B0,
+0x0F120000, // TNP_Regs_BUse1FrameAE(0: off, 1: on)
+0x002A139A,
+0x0F120258, // awbb_GainsMaxMove
+
+// AWB Convergence Speed
+0x002A1464,
+0x0F120008,
+0x0F120190,
+0x0F1200A0,
+
+//Indoor Grid Offset
+0x002A13A4,
+0x0F120050,
+0x0F120000,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F120000,
+0x0F120050,
+0x0F120000,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F120000,
+0x0F120050,
+0x0F120000,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F12FFEC,
+0x0F120000,
+0x0F12FF8C,
+0x0F12000A,
+0x0F12000A,
+0x0F12FFB6,
+0x0F12FFB6,
+0x0F12FF52,
+0x0F12FF8C,
+0x0F12000A,
+0x0F12000A,
+0x0F12FFB6,
+0x0F12FFB6,
+0x0F12FF52,
+0x0F12FF8C,
+0x0F12000A,
+0x0F12000A,
+0x0F12FFB6,
+0x0F12FFB6,
+0x0F12FF52,
+
+//Outdoor Grid Offset
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+0x0F120000,
+
+0x002A1208,
+0x0F120020,
+0x002A144E,
+0x0F12FFD0, //awbb_RGainOff
+0x0F12FFE0, //awbb_BGainOff
+0x0F120000, //awbb_GGainOff
+
+0x002A4800, // Horizon
+0x0F120208, //TVAR_wbt_pBaseCcms[0]
+0x0F12FFB5, //TVAR_wbt_pBaseCcms[1]
+0x0F12FFE8, //TVAR_wbt_pBaseCcms[2]
+0x0F12FF20, //TVAR_wbt_pBaseCcms[3]
+0x0F1201BF, //TVAR_wbt_pBaseCcms[4]
+0x0F12FF53, //TVAR_wbt_pBaseCcms[5]
+0x0F120022, //TVAR_wbt_pBaseCcms[6]
+0x0F12FFEA, //TVAR_wbt_pBaseCcms[7]
+0x0F1201C2, //TVAR_wbt_pBaseCcms[8]
+0x0F1200C6, //TVAR_wbt_pBaseCcms[9]
+0x0F120095, //TVAR_wbt_pBaseCcms[10]
+0x0F12FEFD, //TVAR_wbt_pBaseCcms[11]
+0x0F120206, //TVAR_wbt_pBaseCcms[12]
+0x0F12FF7F, //TVAR_wbt_pBaseCcms[13]
+0x0F120191, //TVAR_wbt_pBaseCcms[14]
+0x0F12FF06, //TVAR_wbt_pBaseCcms[15]
+0x0F1201BA, //TVAR_wbt_pBaseCcms[16]
+0x0F120108, //TVAR_wbt_pBaseCcms[17]
+0x0F120208, //TVAR_wbt_pBaseCcms[18]/* inca A */
+0x0F12FFB5, //TVAR_wbt_pBaseCcms[19]
+0x0F12FFE8, //TVAR_wbt_pBaseCcms[20]
+0x0F12FF20, //TVAR_wbt_pBaseCcms[21]
+0x0F1201BF, //TVAR_wbt_pBaseCcms[22]
+0x0F12FF53, //TVAR_wbt_pBaseCcms[23]
+0x0F120022, //TVAR_wbt_pBaseCcms[24]
+0x0F12FFEA, //TVAR_wbt_pBaseCcms[25]
+0x0F1201C2, //TVAR_wbt_pBaseCcms[26]
+0x0F1200C6, //TVAR_wbt_pBaseCcms[27]
+0x0F120095, //TVAR_wbt_pBaseCcms[28]
+0x0F12FEFD, //TVAR_wbt_pBaseCcms[29]
+0x0F120206, //TVAR_wbt_pBaseCcms[30]
+0x0F12FF7F, //TVAR_wbt_pBaseCcms[31]
+0x0F120191, //TVAR_wbt_pBaseCcms[32]
+0x0F12FF06, //TVAR_wbt_pBaseCcms[33]
+0x0F1201BA, //TVAR_wbt_pBaseCcms[34]
+0x0F120108, //TVAR_wbt_pBaseCcms[35]
+0x0F120208, //TVAR_wbt_pBaseCcms[36] /*WW*/
+0x0F12FFB5, //TVAR_wbt_pBaseCcms[37]
+0x0F12FFE8, //TVAR_wbt_pBaseCcms[38]
+0x0F12FF20, //TVAR_wbt_pBaseCcms[39]
+0x0F1201BF, //TVAR_wbt_pBaseCcms[40]
+0x0F12FF53, //TVAR_wbt_pBaseCcms[41]
+0x0F120022, //TVAR_wbt_pBaseCcms[42]
+0x0F12FFEA, //TVAR_wbt_pBaseCcms[43]
+0x0F1201C2, //TVAR_wbt_pBaseCcms[44]
+0x0F1200C6, //TVAR_wbt_pBaseCcms[45]
+0x0F120095, //TVAR_wbt_pBaseCcms[46]
+0x0F12FEFD, //TVAR_wbt_pBaseCcms[47]
+0x0F120206, //TVAR_wbt_pBaseCcms[48]
+0x0F12FF7F, //TVAR_wbt_pBaseCcms[49]
+0x0F120191, //TVAR_wbt_pBaseCcms[50]
+0x0F12FF06, //TVAR_wbt_pBaseCcms[51]
+0x0F1201BA, //TVAR_wbt_pBaseCcms[52]
+0x0F120108, //TVAR_wbt_pBaseCcms[53]
+0x0F120204,
+0x0F12FFB2,
+0x0F12FFF5,
+0x0F12FEF1,
+0x0F12014E,
+0x0F12FF18,
+0x0F12FFE6,
+0x0F12FFDD,
+0x0F1201B2,
+0x0F1200F2,
+0x0F1200CA,
+0x0F12FF48,
+0x0F120151,
+0x0F12FF50,
+0x0F120147,
+0x0F12FF75,
+0x0F120187,
+0x0F1201BF,
+0x0F120204,
+0x0F12FFB2,
+0x0F12FFF5,
+0x0F12FEF1,
+0x0F12014E,
+0x0F12FF18,
+0x0F12FFD9,
+0x0F12FFBA,
+0x0F1201D4,
+0x0F1200F2,
+0x0F1200CA,
+0x0F12FF48,
+0x0F120151,
+0x0F12FF50,
+0x0F120147,
+0x0F12FF75,
+0x0F120187,
+0x0F1201BF,
+0x0F120204,
+0x0F12FFB2,
+0x0F12FFF5,
+0x0F12FEF1,
+0x0F12014E,
+0x0F12FF18,
+0x0F12FFD9,
+0x0F12FFBA,
+0x0F1201D4,
+0x0F1200F2,
+0x0F1200CA,
+0x0F12FF48,
+0x0F120151,
+0x0F12FF50,
+0x0F120147,
+0x0F12FF75,
+0x0F120187,
+0x0F1201BF,
+
 0x002A0938,	
 0x0F120000,	// on/off AFIT by NB option
 0x0F120014,	//SARR_uNormBrInDoor
@@ -6371,6 +6643,9 @@ const regs_t s5k4ecgx_HD_Camcorder_Disable_regs[] =
 0x0F120008,	//70000D16//AFIT8_ee_iReduceEdgeSlope_Bin [7:0]                                    
 0x0F120001,	//70000D18//AFITB_bnr_nClustLevel_C      [0]                                       
 	
+0x002A060C,
+0x0F120800,	/*lt_ExpGain_ExpCurveGainMaxStr*/
+
 0x002A0250,
 0x0F120A00,	/*REG_TC_GP_PrevReqInputWidth */
 0x0F120780,		/*REG_TC_GP_PrevReqInputHeight */
@@ -6398,8 +6673,8 @@ const regs_t s5k4ecgx_HD_Camcorder_Disable_regs[] =
 0x0F120500,	/*REG_0TC_PCFG_usWidth */
 0x0F1203C0,		/*REG_0TC_PCFG_usHeight */
 
-0x002A02AB,
-0x0F120005,	//REG_0TC_PCFG_Format	  05 : yuv (0~255)  06:yuv (16~234) 07: raw 09 : jpeg  
+0x002A02AA,
+0x0F120006,	//REG_0TC_PCFG_Format	  05 : yuv (0~255)  06:yuv (16~234) 07: raw 09 : jpeg
 
 0x002A0266,
 0x0F120000,	/*	#REG_TC_GP_ActivePrevConfig    	*/
@@ -6414,6 +6689,22 @@ const regs_t s5k4ecgx_HD_Camcorder_Disable_regs[] =
 0x002A023E,
 0x0F120001,	/*	#REG_TC_GP_EnablePreview       	*/
 0x0F120001,	/*	#REG_TC_GP_EnablePreviewChanged	*/
+
+0xFCFCD000,
+0x00287000,
+0x002A02BE,
+0x0F120000,	//REG_0TC_PCFG_usFrTimeType
+0x0F120001,	//REG_0TC_PCFG_FrRateQualityType
+0x0F12014A,//REG_0TC_PCFG_usMaxFrTimeMsecMult10 //014Ah:30fps
+0x0F12014A,//REG_0TC_PCFG_usMinFrTimeMsecMult10 //014Ah:30fps
+0x002A0266,
+0x0F120000,	//REG_TC_GP_ActivePrevConfig
+0x002A026A,
+0x0F120001,	//REG_TC_GP_PrevOpenAfterChange
+0x002A024E,
+0x0F120001,	//REG_TC_GP_NewConfigSync
+0x002A0268,
+0x0F120001,	//REG_TC_GP_PrevConfigChanged
 };
 
 const regs_t s5k4ecgx_preview_size_1280x960_regs[] =
@@ -7319,6 +7610,31 @@ const regs_t s5k4ecgx_focus_mode_macro_regs_cancel3[] =
 0x0F120074,//74,//#REG_TC_AF_ScndWinSizeX
 0x0F120132,    //#REG_TC_AF_ScndWinSizeY
 0x0F120001,    //#REG_TC_AF_WinSizesUpdated
+};
+
+
+const regs_t s5k4exgx_focus_mode_normal_regs_default[]=
+{
+0xFCFCD000,
+0x00287000,
+0x002A028E,
+0x0F120000,
+0xFFFF0043,
+0x002A028C,
+0x0F120004,
+0xFFFF0096,
+};
+
+const regs_t s5k4exgx_focus_mode_macro_regs_default[]=
+{
+0xFCFCD000,
+0x00287000,
+0x002A028E,
+0x0F1200D0, // write lens position from 0000 to 00FF. 0000 means infinity and 00FF means macro.
+0xFFFF0043,
+0x002A028C,
+0x0F120004,
+0xFFFF0096,
 };
 
 /* auto flicker table */ 

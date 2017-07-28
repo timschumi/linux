@@ -46,7 +46,8 @@
 #include <asm/vfp.h>
 #include <../../vfp/vfpinstr.h>
 #include <../../vfp/vfp.h>
-#include <linux/mfd/bcmpmu.h>
+#include <linux/mfd/bcmpmu59xxx.h>
+#include <linux/mfd/bcmpmu59xxx_reg.h>
 #include <linux/io.h>
 #include "mobcom_types.h"
 #include "taskmsgs.h"
@@ -92,6 +93,7 @@
 #define RTCINIT_NULL  (NULL)
 #define RTCINIT_FALSE	(false)
 
+#define RTC_CAL_HW
 
 #define pr_rtcdebug(fmt, ...) \
 	pr_debug(pr_fmt(fmt), ##__VA_ARGS__)
@@ -132,6 +134,7 @@ static unsigned long RTCCAL_Int_Calc = RTCINIT_0;
 static unsigned long RTCCAL_Slippage = RTCINIT_0;
 static unsigned long RTCCAL_PeriodicUpdate = RTCINIT_0;
 static unsigned long RTCCAL_Method = RTCINIT_0;
+static u32 rtc_reg_calib = RTCINIT_0;
 
 static s64 rtccal_period = RTCINIT_0;
 static bool rtc_correction = RTCINIT_FALSE;
@@ -146,7 +149,7 @@ static unsigned long rtc_jiffies_prev;
 
 struct bcmpmu_rtc {
 	struct rtc_device *rtc;
-	struct bcmpmu *bcmpmu;
+	struct bcmpmu59xxx *bcmpmu;
 	wait_queue_head_t wait;
 	struct mutex lock;
 	int alarm_irq_enabled;
@@ -178,10 +181,10 @@ struct rtccal_pdata rtccal_data = {
 	.range_ppm = 400,
 	.cal_thold = 0,
 	.cal_meas_int = 0,
-	.calc_interval = 600,
+	.calc_interval = 0,
 	.update_interval = 0,
-	.slippage_err = 500,
-	.method = 0,
+	.slippage_err = 0,
+	.method = 1,
 };
 
 #endif
@@ -417,7 +420,7 @@ void rtc_util_convert_sec2rtctime_t(struct rtctime_t *pDest, unsigned long time)
 			pDest->year = y + 1 + RTC_YEARBASE;
 			pDest->mon = (unsigned char)1;
 			pDest->mday = 1;
-			rtc_util_calcweekday(pDest);
+			pDest->week = rtc_util_calcweekday(pDest);
 			return;
 		}
 	}
@@ -431,9 +434,12 @@ void rtc_util_convert_sec2rtctime_t(struct rtctime_t *pDest, unsigned long time)
 			break;
 		} else {
 			pDest->year = y + RTC_YEARBASE;
+			if (m == 12)
+				pDest->mon = (unsigned char)(1);
+			else
 			pDest->mon = (unsigned char)(m + 1);
 			pDest->mday = 1;
-			rtc_util_calcweekday(pDest);
+			pDest->week = rtc_util_calcweekday(pDest);
 			return;
 		}
 	}
@@ -655,7 +661,7 @@ void rtc_cal_msg_get_rtctime(void)
 int rtc_cal_get_read_rtctime(struct rtc_time *tm)
 {
 	int ret;
-	unsigned int val;
+	u8 val;
 	struct bcmpmu_rtc *rdata;
 
 	pr_rtcdebug("%s", __func__);
@@ -665,42 +671,39 @@ int rtc_cal_get_read_rtctime(struct rtc_time *tm)
 
 	rdata = rtc_cal_bcmpmu;
 
+	pr_err("%s: accessing pRTC_TC = 0x%x rdata = 0x%x\n", __func__, (unsigned int)pRTC_TC,
+			(unsigned int)rdata);
+
 	pRTC_TC->err_read1 = 0;
 	pRTC_TC->err_read2 = 0;
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCYR,
-					&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCYR, &val);
 	if (unlikely(ret))
 		goto err;
 	tm->tm_year = (val & 0xFF) + 100;
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCMT,
-					&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCMT_WD, &val);
 	if (unlikely(ret))
 		goto err;
 	if (val >= 1)
 		tm->tm_mon = (val & 0x0F) - 1;
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCDT,
-					&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCDT, &val);
 	if (unlikely(ret))
 		goto err;
 	tm->tm_mday = (val & 0x1F);
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCHR,
-					&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCHR, &val);
 	if (unlikely(ret))
 		goto err;
 	tm->tm_hour = (val & 0x1F);
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCMN,
-					&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCMN, &val);
 	if (unlikely(ret))
 		goto err;
 	tm->tm_min = (val & 0x3F);
 
-	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCSC,
-		&val, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTCSC, &val);
 	if (unlikely(ret))
 		goto err;
 	tm->tm_sec = (val & 0x3F);
@@ -782,6 +785,7 @@ static void rtc_cal_correctiontimerstart(unsigned long delay)
 
 }
 
+#if !defined(RTC_CAL_HW)
 static void rtc_cal_correctiontimerstop(void)
 {
 	pr_rtcdebug("%s", __func__);
@@ -789,6 +793,7 @@ static void rtc_cal_correctiontimerstop(void)
 	del_timer_sync(&rtccal_tm_correct);
 	IsCorrectionTimerRun = FALSE;
 }
+#endif
 
 static void rtc_cal_updatetimerstart(void)
 {
@@ -818,6 +823,7 @@ static void rtc_cal_updatetimerstop(void)
 	IsTimerRun = FALSE;
 }
 
+#if !defined(RTC_CAL_HW)
 static u64 rtc_cal_tc_updatevals(unsigned long time)
 {
 	unsigned long time_left, time_total;
@@ -890,7 +896,7 @@ static u64 rtc_cal_tc_updatevals(unsigned long time)
 	return pRTC_TC->time_err_acc;
 
 }
-
+#endif
 
 /*
  * API for calculating slippage amoung at the time of calling. return HZ val
@@ -1208,32 +1214,32 @@ int rtc_cal_tc_set_time(struct rtc_time *tm)
 		return -1;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCYR,
-				tm->tm_year - 100, PMU_BITMASK_ALL);
+				tm->tm_year - 100);
 	if (unlikely(ret))
 		goto err;
 
-	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMT,
-				tm->tm_mon + 1, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMT_WD,
+				tm->tm_mon + 1);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCDT,
-				tm->tm_mday, PMU_BITMASK_ALL);
+				tm->tm_mday);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCHR,
-				tm->tm_hour, PMU_BITMASK_ALL);
+				tm->tm_hour);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMN,
-				tm->tm_min, PMU_BITMASK_ALL);
+				tm->tm_min);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCSC,
-				tm->tm_sec, PMU_BITMASK_ALL);
+				tm->tm_sec);
 	if (unlikely(ret))
 		goto err;
 
@@ -1246,6 +1252,128 @@ err:
 
 }
 
+#if defined(RTC_CAL_HW)
+int rtc_cal_read_rtc_calib(u32 *reg_cal)
+{
+	int ret;
+	u32 cal_reg = 0;
+	u8 cal_temp = 0;
+	struct bcmpmu_rtc *rdata;
+
+	pr_rtcdebug("%s", __func__);
+
+	rtc_correction = false;
+	rdata = rtc_cal_bcmpmu;
+
+	if (rdata == NULL)
+		return -1;
+
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB1,
+				      &cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+	cal_reg += (u32)cal_temp & 0xff;
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB2,
+				      &cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+	cal_reg += ((u32)cal_temp & 0xff) << 8;
+	ret = rdata->bcmpmu->read_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB3,
+				      &cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+	cal_reg += ((u32)cal_temp & 0xff) << 16;
+
+	*reg_cal = cal_reg;
+	pr_rtcdebug("%s:%08lx", __func__, (unsigned long)&reg_cal);
+
+err:
+	pRTC_TC->err_read1 = ret;
+
+	return ret;
+
+}
+
+int rtc_cal_write_rtc_calib(u32 reg_val)
+{
+	int ret;
+	u8 cal_temp = 0;
+	struct bcmpmu_rtc *rdata;
+
+	pr_rtcdebug("%s:%08x", __func__, reg_val);
+
+	rtc_correction = false;
+	rdata = rtc_cal_bcmpmu;
+
+	if (rdata == NULL)
+		return -1;
+
+	cal_temp = (u8)(reg_val & 0xff);
+	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB1,
+				       cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+	cal_temp = (u8)((reg_val >> 8) & 0xff);
+	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB2,
+				       cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+	cal_temp = (u8)((reg_val >> 16) & 0xff);
+	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTC_CALIB3,
+				       cal_temp);
+	if (unlikely(ret))
+		goto err;
+
+err:
+	pRTC_TC->err_write = ret;
+
+	return ret;
+
+}
+
+u32 rtc_cal_conv_rtc_calib(u32 ratio)
+{
+	int direction = 0;
+	u32 diff = 0;
+	u32 clk_val = 0;
+	u32 reg_val = 0;
+
+	if ((RTCCAL_Ratio == ratio) || (ratio == RTCSC_INVALID_RATIO))
+		return 0;	/* no calib */
+
+	/* find direction */
+	if (ratio > RTCCAL_Ratio) {
+		direction = 1;
+		if (ratio > RTCCAL_Ratio_max)
+			ratio = RTCCAL_Ratio_max;
+		diff = ratio - RTCCAL_Ratio;
+	} else {
+		direction = 0;
+		if (ratio < RTCCAL_Ratio_min)
+			ratio = RTCCAL_Ratio_min;
+		diff = RTCCAL_Ratio - ratio;
+	}
+
+	/* ratio to reg */
+	clk_val = RTCCAL_Ratio / diff;
+
+	if (clk_val > 0x1fffff)
+		clk_val = 0x1fffff;
+
+	/* construct reg value */
+	reg_val = (1 << 23) + (direction << 22) + (clk_val >> 5);
+
+	pr_rtcdebug("%s:%lu->%08x(%08x)", __func__, (unsigned long)ratio,
+		    reg_val, clk_val);
+
+	return reg_val;
+}
+#endif /* RTC_CAL_HW */
 
 /*
  * API for handling ratio event. RPC on AP is calling this API
@@ -1255,11 +1383,13 @@ static void rtc_cal_task(void)
 {
 
 	struct rtc_cal_msg_t	msg;
+#if !defined(RTC_CAL_HW)
 	struct rtctime_t time_rtc;
 	unsigned long time_sec = 0;
 	u64 rtc_slip_prev;
 	bool rtc_slip_flag;
 	struct rtc_time tm;
+#endif
 	unsigned int len;
 
 	if (rtccal_semaphore == NULL) {
@@ -1288,6 +1418,7 @@ static void rtc_cal_task(void)
 		down((struct semaphore *)rtccal_semaphore);
 
 		switch (msg.id) {
+#if !defined(RTC_CAL_HW)
 		case RTCCAL_ID_SETTIME: /* set time access from upper layer */
 			pr_rtcdebug("RTCCAL_ID_SETTIME : msg.val1=%lu",
 				msg.val1);
@@ -1296,17 +1427,28 @@ static void rtc_cal_task(void)
 			rtc_cal_tc_start(msg.val1, RTC_RESET_SLIPPAGE, 0);
 			rtc_cal_updatetimerstart();
 			break;
+#endif
 
 		case RTCCAL_ID_CALEVENT: /* Cal event from CP */
 			pr_rtcdebug("RTCCAL_ID_CALEVENT : val1=%lu,val2=%lu",
 				msg.val1, msg.val2);
+			if (RTCCAL_Method == 0) {
 			rtc_cal_tc_update();
 			rtc_cal_tc_savevals();
 			bcm_rtc_cal_timerratio(msg.val1,
 				(unsigned int)(msg.val2));
 			rtc_cal_updatetimerstart();
+			}
+#if defined(RTC_CAL_HW)
+			else if (RTCCAL_Method == 1) {
+				rtc_reg_calib =
+				    rtc_cal_conv_rtc_calib(msg.val1);
+				rtc_cal_write_rtc_calib(rtc_reg_calib);
+			}
+#endif /* RTC_CAL_HW */
 			break;
 
+#if !defined(RTC_CAL_HW)
 		case RTCCAL_ID_UPDATETIME:
 			pr_rtcdebug("RTCCAL_ID_UPDATETIME : time=%lu",
 				msg.val1);
@@ -1345,6 +1487,7 @@ static void rtc_cal_task(void)
 			rtc_util_convert_rtctime_t2tm(&tm, &time_rtc);
 			rtc_cal_tc_set_time(&tm);
 			break;
+#endif
 
 		default:
 			pr_err("No ID found!!");
@@ -1443,7 +1586,12 @@ void rtc_cal_run(void)
 
 	IsRTCRun = true;
 
+	if (RTCCAL_Method == 0)
 	rtc_cal_msg_get_rtctime();
+#if defined(RTC_CAL_HW)
+	else if (RTCCAL_Method == 1)
+		rtc_cal_read_rtc_calib(&rtc_reg_calib);
+#endif /* RTC_CAL_HW */
 
 }
 
@@ -1513,32 +1661,32 @@ int bcm_rtc_cal_set_time(struct bcmpmu_rtc *rdata, struct rtc_time *tm)
 	rtc_cal_bcmpmu = rdata;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCYR,
-				tm->tm_year - 100, PMU_BITMASK_ALL);
+				tm->tm_year - 100);
 	if (unlikely(ret))
 		goto err;
 
-	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMT,
-				tm->tm_mon + 1, PMU_BITMASK_ALL);
+	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMT_WD,
+				tm->tm_mon + 1);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCDT,
-				tm->tm_mday, PMU_BITMASK_ALL);
+				tm->tm_mday);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCHR,
-				tm->tm_hour, PMU_BITMASK_ALL);
+				tm->tm_hour);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCMN,
-				tm->tm_min, PMU_BITMASK_ALL);
+				tm->tm_min);
 	if (unlikely(ret))
 		goto err;
 
 	ret = rdata->bcmpmu->write_dev(rdata->bcmpmu, PMU_REG_RTCSC,
-				tm->tm_sec, PMU_BITMASK_ALL);
+				tm->tm_sec);
 	if (unlikely(ret))
 		goto err;
 
@@ -1568,6 +1716,11 @@ int bcm_rtc_cal_read_time(struct bcmpmu_rtc *rdata, struct rtc_time *tm)
 	if (rdata == NULL || !rtc_cal_isrun()) {
 		pr_rtcdebug("%s: not ready %d", __func__, rtc_cal_isrun());
 		rtc_cal_get_read_rtctime(tm);
+#if defined(RTC_CAL_HW)
+	} else if (RTCCAL_Method == 1) {
+		pr_rtcdebug("%s: HW reading", __func__);
+		rtc_cal_get_read_rtctime(tm);
+#endif
 	} else
 		rtc_cal_tc_get_time(tm);
 
@@ -1873,8 +2026,42 @@ static int rtc_cal_setratio(void *data, u64 val)
 	return 0;
 }
 
-DEFINE_SIMPLE_ATTRIBUTE(rtc_cal_ratio, NULL,
-	rtc_cal_setratio, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(rtc_cal_ratio, NULL, rtc_cal_setratio, "%llu\n");
+
+#if defined(RTC_CAL_HW)
+/*
+ * debug FS for reading calib registers.
+ */
+static ssize_t rtc_cal_test_get_calib(struct file *file, char __user *user_buf,
+				      size_t count, loff_t *ppos)
+{
+	unsigned long rtc_cal_ratio;
+	char buf[256];
+	unsigned long len = 0;
+
+	rtc_cal_read_rtc_calib((u32 *)&rtc_cal_ratio);
+
+	len += snprintf(buf + len, sizeof(buf) - len, "%08lx\n", rtc_cal_ratio);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static const struct file_operations rtc_cal_get_calib = {
+	.read = rtc_cal_test_get_calib,
+};
+
+/*
+ * debug FS for writing calib registers.
+ */
+static int rtc_cal_test_set_calib(void *data, u64 val)
+{
+	rtc_cal_write_rtc_calib((u32)val);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(rtc_cal_set_calib, NULL,
+			rtc_cal_test_set_calib, "%llu\n");
+#endif
 
 static struct dentry *dent_rtc_cal_root_dir;
 
@@ -1927,6 +2114,18 @@ int __init bcm_rtc_cal_debug_init(void)
 	if (!debugfs_create_file("ratio_event", S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH,
 		dent_rtc_cal_root_dir, NULL, &rtc_cal_ratio))
 			return -ENOMEM;
+
+#if defined(RTC_CAL_HW)
+	if (!debugfs_create_file
+	    ("get_calib", S_IRUSR | S_IRGRP | S_IROTH,
+	     dent_rtc_cal_root_dir, NULL, &rtc_cal_get_calib))
+		return -ENOMEM;
+
+	if (!debugfs_create_file
+	    ("set_calib", S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
+	     dent_rtc_cal_root_dir, NULL, &rtc_cal_set_calib))
+		return -ENOMEM;
+#endif
 
 	return 0;
 

@@ -3371,7 +3371,7 @@ int tcp_nuke_addr(struct net *net, struct sockaddr *addr)
 
 	struct in_addr *in;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	struct in6_addr *in6;
+	struct in6_addr *in6 = 0;
 #endif
 	if (family == AF_INET) {
 		in = &((struct sockaddr_in *)addr)->sin_addr;
@@ -3418,11 +3418,12 @@ restart:
 				s6 = &inet->pinet6->rcv_saddr;
 				if (ipv6_addr_type(s6) == IPV6_ADDR_MAPPED)
 					continue;
-
-				if (!ipv6_addr_equal(in6, s6) &&
-				    !(ipv6_addr_equal(in6, &in6addr_any) &&
-				      !tcp_is_local6(net, s6)))
-				continue;
+				if(in6){
+					if (!ipv6_addr_equal(in6, s6) &&
+						!(ipv6_addr_equal(in6, &in6addr_any) &&
+						!tcp_is_local6(net, s6)))
+						continue;
+				}
 			}
 #endif
 

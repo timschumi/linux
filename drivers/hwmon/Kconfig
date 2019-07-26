@@ -1376,6 +1376,12 @@ config SENSORS_MC13783_ADC
         help
           Support for the A/D converter on MC13783 and MC13892 PMIC.
 
+config SENSORS_BCMPMU
+	tristate "BRCM PMUs HWMON"
+	depends on MFD_BCMPMU || MFD_BCM_PMU59056 || MFD_BCM_PMU59xxx
+	default n
+	help
+	  ADC driver for BRM PMU's
 if ACPI
 
 comment "ACPI drivers"

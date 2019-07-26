@@ -61,6 +61,7 @@
 #include <linux/capability.h>
 #include <linux/binfmts.h>
 
+#include <asm/system_misc.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 
@@ -830,6 +831,16 @@ static struct ctl_table kern_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
+	},
+#endif
+#if defined(CONFIG_ARM) && defined(CONFIG_DEBUG_USER)
+	{
+		.procname	= "user_debug",
+		.data		= &user_debug,
+		.maxlen		= sizeof( int ),
+		.mode		= 0644,
+		.child		= NULL,
+		.proc_handler	= &proc_dointvec,
 	},
 #endif
 #if defined(CONFIG_MMU)

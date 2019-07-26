@@ -1099,6 +1099,13 @@ static inline unsigned long get_mm_rss(struct mm_struct *mm)
 		get_mm_counter(mm, MM_ANONPAGES);
 }
 
+#ifdef CONFIG_CMA
+static inline unsigned long get_mm_cma(struct mm_struct *mm)
+{
+	return atomic_long_read(&mm->cma_stat);
+}
+#endif
+
 static inline unsigned long get_mm_hiwater_rss(struct mm_struct *mm)
 {
 	return max(mm->hiwater_rss, get_mm_rss(mm));
@@ -1326,6 +1333,7 @@ extern int __meminit init_per_zone_wmark_min(void);
 extern void mem_init(void);
 extern void __init mmap_init(void);
 extern void show_mem(unsigned int flags);
+extern void show_mem_others(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void si_meminfo_node(struct sysinfo *val, int nid);
 extern int after_bootmem;
@@ -1508,6 +1516,8 @@ int vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
 			unsigned long pfn);
 int vm_insert_mixed(struct vm_area_struct *vma, unsigned long addr,
 			unsigned long pfn);
+int vm_iomap_memory(struct vm_area_struct *vma, phys_addr_t start, unsigned long len);
+
 
 struct page *follow_page(struct vm_area_struct *, unsigned long address,
 			unsigned int foll_flags);
@@ -1596,6 +1606,7 @@ void vmemmap_populate_print_last(void);
 enum mf_flags {
 	MF_COUNT_INCREASED = 1 << 0,
 	MF_ACTION_REQUIRED = 1 << 1,
+	MF_MUST_KILL = 1 << 2,
 };
 extern int memory_failure(unsigned long pfn, int trapno, int flags);
 extern void memory_failure_queue(unsigned long pfn, int trapno, int flags);
@@ -1633,6 +1644,14 @@ static inline bool page_is_guard(struct page *page)
 static inline unsigned int debug_guardpage_minorder(void) { return 0; }
 static inline bool page_is_guard(struct page *page) { return false; }
 #endif /* CONFIG_DEBUG_PAGEALLOC */
+
+struct reg_show_mem {
+	void (*cbk)(struct reg_show_mem *reg_show_mem);
+	struct list_head list;
+};
+
+extern void register_show_mem(struct reg_show_mem *);
+extern void unregister_show_mem(struct reg_show_mem *);
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

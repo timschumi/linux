@@ -17,9 +17,13 @@
 #include <linux/fb.h>
 #include <linux/backlight.h>
 #include <linux/err.h>
-#include <linux/pwm.h>
+#include <linux/pwm/pwm.h>
 #include <linux/pwm_backlight.h>
 #include <linux/slab.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+#include <mach/pinmux.h>
 
 struct pwm_bl_data {
 	struct pwm_device	*pwm;
@@ -31,7 +35,27 @@ struct pwm_bl_data {
 	void			(*notify_after)(struct device *,
 					int brightness);
 	int			(*check_fb)(struct device *, struct fb_info *);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend bd_early_suspend;
+#endif
+	struct delayed_work bl_delay_on_work;
 };
+
+/*
+During soft reset, the PWM registers are reset but the pad
+control registers are not.
+So for a short duration (till loader sets 0x404 to PWM control
+register) the PWM output remains high.
+
+During hard reset this is not seen as both the pad control and
+the PWM registers are in reset state.
+
+Hence setting the function of pad cntrl register at 0x3500489C from
+PWM2 to GPIO24 on soft reset.
+*/
+static int pwm_pin = -1;
+static int pwm_pin_reboot_func = -1;
+
 
 static int pwm_backlight_update_status(struct backlight_device *bl)
 {
@@ -77,20 +101,134 @@ static int pwm_backlight_check_fb(struct backlight_device *bl,
 	return !pb->check_fb || pb->check_fb(pb->dev, info);
 }
 
+static void bl_delay_on_func(struct work_struct *work)
+{
+	struct pwm_bl_data *pb =
+		container_of(work, struct pwm_bl_data, bl_delay_on_work.work);
+	struct platform_device *pdev =
+		container_of(pb->dev, struct platform_device, dev);
+	struct backlight_device *bl = dev_get_drvdata(&pdev->dev);
+
+	pr_info("bl_delay_on_func update brightness\r\n");
+	backlight_update_status(bl);
+}
+
 static const struct backlight_ops pwm_backlight_ops = {
 	.update_status	= pwm_backlight_update_status,
 	.get_brightness	= pwm_backlight_get_brightness,
 	.check_fb	= pwm_backlight_check_fb,
 };
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void backlight_driver_early_suspend(struct early_suspend *h)
+{
+	struct pwm_bl_data *pb = container_of(h, struct pwm_bl_data, bd_early_suspend);
+	struct platform_device *pdev = container_of(pb->dev, struct platform_device, dev);
+	struct backlight_device *bl = dev_get_drvdata(&pdev->dev);
+
+	if( bl->props.brightness) {
+		pwm_config(pb->pwm, 0, pb->period);
+		pwm_disable(pb->pwm);
+	}
+}
+
+static void backlight_driver_late_resume(struct early_suspend *h)
+{
+	struct pwm_bl_data *pb = container_of(h, struct pwm_bl_data, bd_early_suspend);
+	struct platform_device *pdev = container_of(pb->dev, struct platform_device, dev);
+	struct backlight_device *bl = dev_get_drvdata(&pdev->dev);
+	int brightness = bl->props.brightness;
+
+	if (brightness) {
+		brightness = pb->lth_brightness +
+			(brightness * (pb->period - pb->lth_brightness) /
+			bl->props.max_brightness);
+		pwm_config(pb->pwm, brightness, pb->period);
+		pwm_enable(pb->pwm);
+	}
+}
+#endif
 
 static int pwm_backlight_probe(struct platform_device *pdev)
 {
 	struct backlight_properties props;
-	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
+	struct platform_pwm_backlight_data *data = NULL;
 	struct backlight_device *bl;
 	struct pwm_bl_data *pb;
+	const char *pwm_request_label = NULL;
 	int ret;
+	int bl_delay_on = 0;
 
+	if (pdev->dev.platform_data)
+		data = pdev->dev.platform_data;
+
+	else if (pdev->dev.of_node) {
+		u32 val;
+		data = kzalloc(sizeof(struct platform_pwm_backlight_data),
+				GFP_KERNEL);
+		if (!data)
+			return -ENOMEM;
+
+		if (of_property_read_u32(pdev->dev.of_node, "pwm-id", &val)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+		data->pwm_id = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"max-brightness", &val)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+		data->max_brightness = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"dft-brightness", &val)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+		data->dft_brightness = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"polarity", &val)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+		data->polarity = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"pwm-period-ns", &val)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+		data->pwm_period_ns = val;
+
+		if (of_property_read_string(pdev->dev.of_node,
+			"pwm-request-label", &pwm_request_label)) {
+			ret = -EINVAL;
+			goto err_read;
+		}
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"bl-on-delay", &val)) {
+			bl_delay_on = 0;
+		} else
+			bl_delay_on = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"pwm_pin_name", &val)) {
+			pwm_pin = -1;
+		} else
+			pwm_pin = val;
+
+		if (of_property_read_u32(pdev->dev.of_node,
+				"pwm_pin_reboot_func", &val)) {
+			pwm_pin_reboot_func = -1;
+		} else
+			pwm_pin_reboot_func = val;
+
+		pdev->dev.platform_data = data;
+
+	}
 	if (!data) {
 		dev_err(&pdev->dev, "failed to find platform data\n");
 		return -EINVAL;
@@ -110,14 +248,18 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	}
 
 	pb->period = data->pwm_period_ns;
+
 	pb->notify = data->notify;
 	pb->notify_after = data->notify_after;
 	pb->check_fb = data->check_fb;
 	pb->lth_brightness = data->lth_brightness *
 		(data->pwm_period_ns / data->max_brightness);
 	pb->dev = &pdev->dev;
+	if (pdev->dev.of_node)
+		pb->pwm = pwm_request(data->pwm_id, pwm_request_label);
+	else
+		pb->pwm = pwm_request(data->pwm_id, "backlight");
 
-	pb->pwm = pwm_request(data->pwm_id, "backlight");
 	if (IS_ERR(pb->pwm)) {
 		dev_err(&pdev->dev, "unable to request PWM for backlight\n");
 		ret = PTR_ERR(pb->pwm);
@@ -137,9 +279,24 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	}
 
 	bl->props.brightness = data->dft_brightness;
-	backlight_update_status(bl);
+	pwm_set_polarity(pb->pwm, data->polarity);
+
+	pr_info("pwm_backlight_probe bl-delay-on %d\r\n", bl_delay_on);
+	if (bl_delay_on == 0)
+		backlight_update_status(bl);
+	else {
+		INIT_DELAYED_WORK(&(pb->bl_delay_on_work), bl_delay_on_func);
+		schedule_delayed_work(&(pb->bl_delay_on_work),
+			msecs_to_jiffies(bl_delay_on));
+	}
 
 	platform_set_drvdata(pdev, bl);
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	pb->bd_early_suspend.suspend = backlight_driver_early_suspend;
+	pb->bd_early_suspend.resume = backlight_driver_late_resume;
+	pb->bd_early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	register_early_suspend(&pb->bd_early_suspend);
+#endif
 	return 0;
 
 err_bl:
@@ -147,6 +304,9 @@ err_bl:
 err_alloc:
 	if (data->exit)
 		data->exit(&pdev->dev);
+err_read:
+	if (pdev->dev.of_node)
+		kfree(data);
 	return ret;
 }
 
@@ -155,14 +315,31 @@ static int pwm_backlight_remove(struct platform_device *pdev)
 	struct platform_pwm_backlight_data *data = pdev->dev.platform_data;
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct pwm_bl_data *pb = dev_get_drvdata(&bl->dev);
-
 	backlight_device_unregister(bl);
 	pwm_config(pb->pwm, 0, pb->period);
 	pwm_disable(pb->pwm);
 	pwm_free(pb->pwm);
-	if (data->exit)
+	if (data && data->exit)
 		data->exit(&pdev->dev);
+	if (data && pdev->dev.of_node) {
+		kfree(data);
+		pdev->dev.platform_data = NULL;
+	}
 	return 0;
+}
+
+static void pwm_backlight_shutdown(struct platform_device *pdev)
+{
+	struct pin_config new_pin_config;
+
+	/*reset the pwm pin to GPIO function if defined in the kernel-dtb*/
+	if (pwm_pin >= 0 && pwm_pin_reboot_func >= 0) {
+		pr_info("reset the pwm pin to GPIO function\r\n");
+		new_pin_config.name = pwm_pin;
+		pinmux_get_pin_config(&new_pin_config);
+		new_pin_config.func = pwm_pin_reboot_func;
+		pinmux_set_pin_config(&new_pin_config);
+	}
 }
 
 #ifdef CONFIG_PM
@@ -173,8 +350,7 @@ static int pwm_backlight_suspend(struct device *dev)
 
 	if (pb->notify)
 		pb->notify(pb->dev, 0);
-	pwm_config(pb->pwm, 0, pb->period);
-	pwm_disable(pb->pwm);
+
 	if (pb->notify_after)
 		pb->notify_after(pb->dev, 0);
 	return 0;
@@ -182,9 +358,6 @@ static int pwm_backlight_suspend(struct device *dev)
 
 static int pwm_backlight_resume(struct device *dev)
 {
-	struct backlight_device *bl = dev_get_drvdata(dev);
-
-	backlight_update_status(bl);
 	return 0;
 }
 
@@ -192,17 +365,23 @@ static SIMPLE_DEV_PM_OPS(pwm_backlight_pm_ops, pwm_backlight_suspend,
 			 pwm_backlight_resume);
 
 #endif
-
+static const struct of_device_id pwm_backlight_of_match[] = {
+	{ .compatible = "bcm,pwm-backlight", },
+	{},
+}
+MODULE_DEVICE_TABLE(of, pwm_backlight_of_match);
 static struct platform_driver pwm_backlight_driver = {
 	.driver		= {
 		.name	= "pwm-backlight",
 		.owner	= THIS_MODULE,
+		.of_match_table = pwm_backlight_of_match,
 #ifdef CONFIG_PM
 		.pm	= &pwm_backlight_pm_ops,
 #endif
 	},
 	.probe		= pwm_backlight_probe,
 	.remove		= pwm_backlight_remove,
+	.shutdown	= pwm_backlight_shutdown,
 };
 
 module_platform_driver(pwm_backlight_driver);

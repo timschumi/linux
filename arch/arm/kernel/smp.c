@@ -42,6 +42,9 @@
 #include <asm/ptrace.h>
 #include <asm/localtimer.h>
 #include <asm/smp_plat.h>
+#if defined(CONFIG_CDEBUGGER)
+#include <mach/cdebugger.h>
+#endif
 
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
@@ -250,18 +253,24 @@ static void percpu_timer_setup(void);
 asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = smp_processor_id();
+	unsigned int cpu;
+
+	/*
+	 * The identity mapping is uncached (strongly ordered), so
+	 * switch away from it before attempting any exclusive accesses.
+	 */
+	cpu_switch_mm(mm->pgd, mm);
+	enter_lazy_tlb(mm, current);
+	local_flush_tlb_all();
 
 	/*
 	 * All kernel threads share the same mm context; grab a
 	 * reference and switch to it.
 	 */
+	cpu = smp_processor_id();
 	atomic_inc(&mm->mm_count);
 	current->active_mm = mm;
 	cpumask_set_cpu(cpu, mm_cpumask(mm));
-	cpu_switch_mm(mm->pgd, mm);
-	enter_lazy_tlb(mm, current);
-	local_flush_tlb_all();
 
 	printk("CPU%u: Booted secondary processor\n", cpu);
 
@@ -608,6 +617,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		break;
 
 	case IPI_CPU_STOP:
+#if defined(CONFIG_CDEBUGGER)
+		/* save context */
+		cdebugger_save_pte((void *)regs, (int )current);
+#endif
+		flush_cache_all();
+		outer_flush_all();
+		dmb();
+
 		irq_enter();
 		ipi_cpu_stop(cpu);
 		irq_exit();
@@ -648,7 +665,8 @@ void smp_send_stop(void)
 
 	cpumask_copy(&mask, cpu_online_mask);
 	cpumask_clear_cpu(smp_processor_id(), &mask);
-	smp_cross_call(&mask, IPI_CPU_STOP);
+	if (!cpumask_empty(&mask))
+		smp_cross_call(&mask, IPI_CPU_STOP);
 
 	/* Wait up to one second for other CPUs to stop */
 	timeout = USEC_PER_SEC;
@@ -668,3 +686,13 @@ int setup_profiling_timer(unsigned int multiplier)
 {
 	return -EINVAL;
 }
+
+#ifdef CONFIG_USE_ARCH_TIMER_AS_LOCAL_TIMER
+void smp_get_evt_context(struct clock_event_device __percpu **p_arch_timer_evt)
+{
+	pr_info("======= %s(): &percpu_clockevent %p p_arch_timer_evt %p \r\n",
+		__func__, &percpu_clockevent, p_arch_timer_evt);
+	if (p_arch_timer_evt)
+		*p_arch_timer_evt = &percpu_clockevent;
+}
+#endif

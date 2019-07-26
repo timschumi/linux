@@ -207,6 +207,9 @@
 /* Xilinx PSS UART */
 #define PORT_XUARTPS	98
 
+/* Broadcom Virtual UART */
+#define PORT_BCMVUART	93
+
 /* Atheros AR933X SoC */
 #define PORT_AR933X	99
 
@@ -327,6 +330,7 @@ struct uart_port {
 #define UPIO_AU			(4)			/* Au1x00 type IO */
 #define UPIO_TSI		(5)			/* Tsi108/109 type IO */
 #define UPIO_RM9000		(6)			/* RM9000 type IO */
+#define UPIO_DWAPB              (7)                     /* DesignWare APB UART */
 
 	unsigned int		read_status_mask;	/* driver specific */
 	unsigned int		ignore_status_mask;	/* driver specific */

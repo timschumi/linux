@@ -5,13 +5,13 @@
  * Definitions subject to change without notice.
  *
  * Copyright (C) 1999-2012, Broadcom Corporation
- * 
+ *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
  * available at http://www.broadcom.com/licenses/GPLv2.php, with the
  * following added to such license:
- * 
+ *
  *      As a special exception, the copyright holders of this software give you
  * permission to link this software with independent modules, and to copy and
  * distribute the resulting executable under terms of your choice, provided that
@@ -19,12 +19,12 @@
  * the license of that module.  An independent module is a module which is not
  * derived from this software.  The special exception does not apply to any
  * modifications of the software.
- * 
+ *
  *      Notwithstanding the above, under no circumstances may you combine this
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: wlioctl.h 334796 2012-05-23 22:59:44Z $
+ * $Id: wlioctl.h 384901 2013-02-13 14:23:41Z $
  */
 
 #ifndef _wlioctl_h_
@@ -304,7 +304,7 @@ typedef struct wl_clm_dload_info wl_clm_dload_info_t;
 
 typedef struct wlc_ssid {
 	uint32		SSID_len;
-	uchar		SSID[32];
+	uchar		SSID[DOT11_MAX_SSID_LEN];
 } wlc_ssid_t;
 
 #ifndef LINUX_POSTMOGRIFY_REMOVAL
@@ -441,6 +441,19 @@ typedef struct wl_scan_results {
 /* Used in EXT_STA */
 #define DNGL_RXCTXT_SIZE	45
 
+#if defined(SIMPLE_ISCAN)
+#define ISCAN_RETRY_CNT   5
+#define ISCAN_STATE_IDLE   0
+#define ISCAN_STATE_SCANING 1
+#define ISCAN_STATE_PENDING 2
+
+/* the buf lengh can be WLC_IOCTL_MAXLEN (8K) to reduce iteration */
+#define WLC_IW_ISCAN_MAXLEN   2048
+typedef struct iscan_buf {
+	struct iscan_buf * next;
+	char   iscan_buf[WLC_IW_ISCAN_MAXLEN];
+} iscan_buf_t;
+#endif /* SIMPLE_ISCAN */
 
 #define ESCAN_REQ_VERSION 1
 
@@ -809,6 +822,29 @@ typedef struct wl_rm_rep {
 } wl_rm_rep_t;
 #define WL_RM_REP_FIXED_LEN	8
 
+#ifdef BCMCCX
+
+#define LEAP_USER_MAX		32
+#define LEAP_DOMAIN_MAX		32
+#define LEAP_PASSWORD_MAX	32
+
+typedef struct wl_leap_info {
+	wlc_ssid_t ssid;
+	uint8 user_len;
+	uchar user[LEAP_USER_MAX];
+	uint8 password_len;
+	uchar password[LEAP_PASSWORD_MAX];
+	uint8 domain_len;
+	uchar domain[LEAP_DOMAIN_MAX];
+} wl_leap_info_t;
+
+typedef struct wl_leap_list {
+	uint32 buflen;
+	uint32 version;
+	uint32 count;
+	wl_leap_info_t leap_info[1];
+} wl_leap_list_t;
+#endif	/* BCMCCX */
 
 typedef enum sup_auth_status {
 	/* Basic supplicant authentication states */
@@ -843,7 +879,17 @@ typedef enum sup_auth_status {
 #define CRYPTO_ALGO_AES_CCM		4
 #define CRYPTO_ALGO_AES_OCB_MSDU	5
 #define CRYPTO_ALGO_AES_OCB_MPDU	6
+#if !defined(BCMCCX) && !defined(BCMEXTCCX)
 #define CRYPTO_ALGO_NALG		7
+#else
+#define CRYPTO_ALGO_CKIP		7
+#define CRYPTO_ALGO_CKIP_MMH		8
+#define CRYPTO_ALGO_WEP_MMH		9
+#define CRYPTO_ALGO_NALG		10
+#endif /* !BCMCCX && !BCMEXTCCX */
+#ifdef BCMWAPI_WPI
+#define CRYPTO_ALGO_SMS4		11
+#endif /* BCMWAPI_WPI */
 #define CRYPTO_ALGO_PMK			12	/* for 802.1x supp to set PMK before 4-way */
 
 #define WSEC_GEN_MIC_ERROR	0x0001
@@ -855,8 +901,13 @@ typedef enum sup_auth_status {
 
 #define WL_SOFT_KEY	(1 << 0)	/* Indicates this key is using soft encrypt */
 #define WL_PRIMARY_KEY	(1 << 1)	/* Indicates this key is the primary (ie tx) key */
+#if defined(BCMCCX) || defined(BCMEXTCCX)
+#define WL_CKIP_KP	(1 << 4)	/* CMIC */
+#define WL_CKIP_MMH	(1 << 5)	/* CKIP */
+#else
 #define WL_KF_RES_4	(1 << 4)	/* Reserved for backward compat */
 #define WL_KF_RES_5	(1 << 5)	/* Reserved for backward compat */
+#endif /* BCMCCX || BCMEXTCCX */
 #define WL_IBSS_PEER_GROUP_KEY	(1 << 6)	/* Indicates a group key for a IBSS PEER */
 
 typedef struct wl_wsec_key {
@@ -897,15 +948,45 @@ typedef struct {
 #define TKIP_ENABLED		0x0002
 #define AES_ENABLED		0x0004
 #define WSEC_SWFLAG		0x0008
+#ifdef BCMCCX
+#define CKIP_KP_ENABLED		0x0010
+#define CKIP_MIC_ENABLED	0x0020
+#endif /* BCMCCX */
 #define SES_OW_ENABLED		0x0040	/* to go into transition mode without setting wep */
+#ifdef BCMWAPI_WPI
+#define SMS4_ENABLED		0x0100
+#endif /* BCMWAPI_WPI */
 
 /* wsec macros for operating on the above definitions */
 #define WSEC_WEP_ENABLED(wsec)	((wsec) & WEP_ENABLED)
 #define WSEC_TKIP_ENABLED(wsec)	((wsec) & TKIP_ENABLED)
 #define WSEC_AES_ENABLED(wsec)	((wsec) & AES_ENABLED)
 
+#ifdef BCMCCX
+#define WSEC_CKIP_KP_ENABLED(wsec)	((wsec) & CKIP_KP_ENABLED)
+#define WSEC_CKIP_MIC_ENABLED(wsec)	((wsec) & CKIP_MIC_ENABLED)
+#define WSEC_CKIP_ENABLED(wsec)	((wsec) & (CKIP_KP_ENABLED|CKIP_MIC_ENABLED))
+
+#ifdef BCMWAPI_WPI
+#define WSEC_ENABLED(wsec) \
+	((wsec) & (WEP_ENABLED | TKIP_ENABLED | AES_ENABLED | CKIP_KP_ENABLED |	\
+	  CKIP_MIC_ENABLED | SMS4_ENABLED))
+#else /* BCMWAPI_WPI */
+#define WSEC_ENABLED(wsec) \
+		((wsec) & \
+		 (WEP_ENABLED | TKIP_ENABLED | AES_ENABLED | CKIP_KP_ENABLED | CKIP_MIC_ENABLED))
+#endif /* BCMWAPI_WPI */
+#else /* defined BCMCCX */
+#ifdef BCMWAPI_WPI
+#define WSEC_ENABLED(wsec)	((wsec) & (WEP_ENABLED | TKIP_ENABLED | AES_ENABLED | SMS4_ENABLED))
+#else /* BCMWAPI_WPI */
 #define WSEC_ENABLED(wsec)	((wsec) & (WEP_ENABLED | TKIP_ENABLED | AES_ENABLED))
+#endif /* BCMWAPI_WPI */
+#endif /* BCMCCX */
 #define WSEC_SES_OW_ENABLED(wsec)	((wsec) & SES_OW_ENABLED)
+#ifdef BCMWAPI_WAI
+#define WSEC_SMS4_ENABLED(wsec)	((wsec) & SMS4_ENABLED)
+#endif /* BCMWAPI_WAI */
 
 #ifdef MFP
 #define MFP_CAPABLE		0x0200
@@ -918,11 +999,21 @@ typedef struct {
 #define WPA_AUTH_NONE		0x0001	/* none (IBSS) */
 #define WPA_AUTH_UNSPECIFIED	0x0002	/* over 802.1x */
 #define WPA_AUTH_PSK		0x0004	/* Pre-shared key */
+#if defined(BCMCCX) || defined(BCMEXTCCX)
+#define WPA_AUTH_CCKM		0x0008	/* CCKM */
+#define WPA2_AUTH_CCKM		0x0010	/* CCKM2 */
+#endif	/* BCMCCX || BCMEXTCCX */
 /* #define WPA_AUTH_8021X 0x0020 */	/* 802.1x, reserved */
 #define WPA2_AUTH_UNSPECIFIED	0x0040	/* over 802.1x */
 #define WPA2_AUTH_PSK		0x0080	/* Pre-shared key */
 #define BRCM_AUTH_PSK           0x0100  /* BRCM specific PSK */
 #define BRCM_AUTH_DPT		0x0200	/* DPT PSK without group keys */
+#if defined(BCMWAPI_WAI) || defined(BCMWAPI_WPI)
+#define WPA_AUTH_WAPI           0x0400
+#define WAPI_AUTH_NONE		WPA_AUTH_NONE	/* none (IBSS) */
+#define WAPI_AUTH_UNSPECIFIED	0x0400	/* over AS */
+#define WAPI_AUTH_PSK		0x0800	/* Pre-shared key */
+#endif /* BCMWAPI_WAI || BCMWAPI_WPI */
 #define WPA2_AUTH_MFP           0x1000  /* MFP (11w) in contrast to CCX */
 #define WPA2_AUTH_TPK		0x2000 	/* TDLS Peer Key */
 #define WPA2_AUTH_FT		0x4000 	/* Fast Transition. */
@@ -1895,6 +1986,12 @@ typedef struct wl_po {
 #define	WLAN_AUTO	3	/* ACI: auto detect */
 #define	WLAN_AUTO_W_NOISE	4	/* ACI: auto - detect and non 802.11 interference */
 #define AUTO_ACTIVE	(1 << 7) /* Auto is currently active */
+
+/* AP environment */
+#define AP_ENV_DETECT_NOT_USED		0 /* We aren't using AP environment detection */
+#define AP_ENV_DENSE			1 /* "Corporate" or other AP dense environment */
+#define AP_ENV_SPARSE			2 /* "Home" or other sparse environment */
+#define AP_ENV_INDETERMINATE		3 /* AP environment hasn't been identified */
 
 typedef struct wl_aci_args {
 	int enter_aci_thresh; /* Trigger level to start detecting ACI */
@@ -3585,6 +3682,13 @@ typedef	struct wme_max_bandwidth {
 #define TSPEC_UNKNOWN		3	/* TSPEC unknown */
 #define TSPEC_STATUS_MASK	7	/* TSPEC status mask */
 
+#ifdef BCMCCX
+/* "wlan_reason" iovar interface */
+#define WL_WLAN_ASSOC_REASON_NORMAL_NETWORK	0 /* normal WLAN network setup */
+#define WL_WLAN_ASSOC_REASON_ROAM_FROM_CELLULAR_NETWORK	1 /* roam from Cellular network */
+#define WL_WLAN_ASSOC_REASON_ROAM_FROM_LAN	2 /* roam from LAN */
+#define WL_WLAN_ASSOC_REASON_MAX		2 /* largest value allowed */
+#endif /* BCMCCX */
 
 /* Software feature flag defines used by wlfeatureflag */
 #ifdef WLAFTERBURNER
@@ -4406,6 +4510,20 @@ typedef struct assertlog_results {
 #define LOGRRC_FIX_LEN	8
 #define IOBUF_ALLOWED_NUM_OF_LOGREC(type, len) ((len - LOGRRC_FIX_LEN)/sizeof(type))
 
+#ifdef BCMWAPI_WAI
+#define IV_LEN 16
+struct wapi_sta_msg_t
+{
+	uint16	msg_type;
+	uint16	datalen;
+	uint8	vap_mac[6];
+	uint8	reserve_data1[2];
+	uint8	sta_mac[6];
+	uint8	reserve_data2[2];
+	uint8	gsn[IV_LEN];
+	uint8	wie[256];
+};
+#endif /* BCMWAPI_WAI */
 
 /* channel interference measurement (chanim) related defines */
 

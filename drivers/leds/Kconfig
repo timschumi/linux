@@ -24,6 +24,17 @@ config LEDS_CLASS
 
 comment "LED drivers"
 
+config LEDS_BCM_PMU59xxx
+	tristate "LED Support for BCM PMIC"
+	depends on LEDS_CLASS
+	depends on MFD_BCM_PMU59xxx
+	help
+	  This option enables support for LED drivers
+	  found on BCM PMIC, this LED will be controled
+	  by software if you say Y, and if you want this
+	  LED controled by hardware, say N.
+
+
 config LEDS_88PM860X
 	tristate "LED Support for Marvell 88PM860x PMIC"
 	depends on LEDS_CLASS
@@ -156,6 +167,23 @@ config LEDS_GPIO
 	  and they must be connected to the GPIO lines.  The LEDs must be
 	  defined as platform devices and/or OpenFirmware platform devices.
 	  The code to use these bindings can be selected below.
+
+config LEDS_GPIO_PLATFORM
+	bool "Platform device bindings for GPIO LEDs"
+	depends on LEDS_GPIO
+	default y
+	help
+	  Let the leds-gpio driver drive LEDs which have been defined as
+	  platform devices.  If you don't know what this means, say yes.
+
+config LEDS_GPIO_OF
+	bool "OpenFirmware platform device bindings for GPIO LEDs"
+	depends on LEDS_GPIO && OF_DEVICE
+	default y
+	help
+	  Let the leds-gpio driver drive LEDs which have been defined as
+	  of_platform devices.  For instance, LEDs which are listed in a "dts"
+	  file.
 
 config LEDS_LP3944
 	tristate "LED Support for N.S. LP3944 (Fun Light) I2C chip"
@@ -366,6 +394,13 @@ config LEDS_ASIC3
 	  ASIC3 LED GPIOs are inputs, not outputs, thus the leds-gpio driver
 	  cannot be used. This driver supports hardware blinking with an on+off
 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
+
+config LEDS_ISLANDS_FF
+        tristate "LED Support for Islands FF"
+        depends on VC_GENCMD
+        help
+          This option enable support for on-chip LED drivers found
+          on Broadcom Islands FF
 
 config LEDS_RENESAS_TPU
 	bool "LED support for Renesas TPU"

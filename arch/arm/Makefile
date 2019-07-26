@@ -113,9 +113,24 @@ endif
 endif
 
 # Need -Uarm for gcc < 3.x
-KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_THUMB2) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -Uarm
+KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_THUMB2) $(arch-y) $(tune-y) -include asm/unified.h
 
+ifeq ($(CONFIG_VFP),y)
+ifeq ($(CONFIG_VFPv3),y)
+# v3 vfp
+KBUILD_CFLAGS	+=-mfpu=vfp3 -mfloat-abi=softfp
+KBUILD_AFLAGS	+=-mfpu=vfp3 -mfloat-abi=softfp 
+else
+#non-v3 vfp
+KBUILD_CFLAGS	+=-mfloat-abi=softfp
+KBUILD_AFLAGS	+=-mfloat-abi=softfp
+endif
+else
+#no vfp
+KBUILD_CFLAGS	+=-mfloat-abi=soft
+KBUILD_AFLAGS	+=-mfloat-abi=soft
+endif
 CHECKFLAGS	+= -D__arm__
 
 #Default value
@@ -173,6 +188,7 @@ machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
 machine-$(CONFIG_ARCH_PRIMA2)		:= prima2
 machine-$(CONFIG_ARCH_PXA)		:= pxa
 machine-$(CONFIG_ARCH_REALVIEW)		:= realview
+machine-$(CONFIG_ARCH_HAWAII)		:= hawaii
 machine-$(CONFIG_ARCH_RPC)		:= rpc
 machine-$(CONFIG_ARCH_S3C24XX)		:= s3c24xx s3c2412 s3c2440
 machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
@@ -212,6 +228,7 @@ plat-$(CONFIG_PLAT_S3C24XX)	:= s3c24xx samsung
 plat-$(CONFIG_PLAT_S5P)		:= s5p samsung
 plat-$(CONFIG_PLAT_SPEAR)	:= spear
 plat-$(CONFIG_PLAT_VERSATILE)	:= versatile
+plat-$(CONFIG_ARCH_KONA)        := kona
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.
@@ -277,7 +294,7 @@ archprepare:
 # Convert bzImage to zImage
 bzImage: zImage
 
-zImage Image xipImage bootpImage uImage: vmlinux
+zImage Image xipImage bootpImage uImage dt-blob: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
 
 zinstall uinstall install: vmlinux

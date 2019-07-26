@@ -295,7 +295,14 @@ void l2cap_chan_destroy(struct l2cap_chan *chan)
 	list_del(&chan->global_l);
 	write_unlock(&chan_list_lock);
 
-	l2cap_chan_put(chan);
+	kfree(chan);
+}
+
+void l2cap_chan_put(struct l2cap_chan *chan)
+{
+	BT_DBG("chan %p orig refcnt %d", chan, atomic_read(&chan->refcnt));
+	if (atomic_dec_and_test(&chan->refcnt))
+		l2cap_chan_destroy(chan);
 }
 
 void __l2cap_chan_add(struct l2cap_conn *conn, struct l2cap_chan *chan)
@@ -1016,6 +1023,7 @@ static void l2cap_conn_del(struct hci_conn *hcon, int err)
 
 	/* Kill channels */
 	list_for_each_entry_safe(chan, l, &conn->chan_l, list) {
+		l2cap_chan_hold(chan);
 		l2cap_chan_lock(chan);
 
 		l2cap_chan_del(chan, err);
@@ -1023,6 +1031,7 @@ static void l2cap_conn_del(struct hci_conn *hcon, int err)
 		l2cap_chan_unlock(chan);
 
 		chan->ops->close(chan->data);
+		l2cap_chan_put(chan);
 	}
 
 	mutex_unlock(&conn->chan_lock);
@@ -3092,11 +3101,13 @@ static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd
 	sk->sk_shutdown = SHUTDOWN_MASK;
 	release_sock(sk);
 
+	l2cap_chan_hold(chan);
 	l2cap_chan_del(chan, ECONNRESET);
 
 	l2cap_chan_unlock(chan);
 
 	chan->ops->close(chan->data);
+	l2cap_chan_put(chan);
 
 	mutex_unlock(&conn->chan_lock);
 

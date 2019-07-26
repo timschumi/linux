@@ -601,6 +601,7 @@ config DCC_TTY
 	depends on ARM
 
 source "drivers/s390/char/Kconfig"
+source "drivers/char/broadcom/Kconfig"
 
 config RAMOOPS
 	tristate "Log panic/oops to a RAM buffer"
@@ -617,6 +618,13 @@ config MSM_SMD_PKT
 	help
 	  Enables userspace clients to read and write to some packet SMD
 	  ports via device interface for MSM chipset.
+
+config BCM_GPS
+	tristate "GPS support"
+	default n
+	---help---
+	  Select this to include GPS support for BCMHANA
+	  If unsure, say N.
 
 config TILE_SROM
 	bool "Character-device access via hypervisor to the Tilera SPI ROM"

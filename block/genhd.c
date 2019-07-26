@@ -601,6 +601,7 @@ void add_disk(struct gendisk *disk)
 	 */
 	disk->major = MAJOR(devt);
 	disk->first_minor = MINOR(devt);
+	disk_alloc_events(disk);
 
 	disk_alloc_events(disk);
 
@@ -1777,7 +1778,6 @@ static void disk_alloc_events(struct gendisk *disk)
 	ev->block = 1;
 	ev->poll_msecs = -1;
 	INIT_DELAYED_WORK(&ev->dwork, disk_events_workfn);
-
 	disk->ev = ev;
 }
 

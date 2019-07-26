@@ -1742,7 +1742,16 @@ struct baud_rates {
 };
 
 static const struct baud_rates baud_rates[] = {
+	{ 4000000, B4000000 },
+	{ 3500000, B3500000 },
+	{ 3000000, B3000000 },
+	{ 2500000, B2500000 },
+	{ 2000000, B2000000 },
+	{ 1500000, B1500000 },
+	{ 1152000, B1152000 },
+	{ 1000000, B1000000 },
 	{ 921600, B921600 },
+	{ 500000, B500000 },
 	{ 460800, B460800 },
 	{ 230400, B230400 },
 	{ 115200, B115200 },
@@ -1968,7 +1977,8 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *uport)
 
 		if (console_suspend_enabled)
 			uart_change_pm(state, 0);
-		uport->ops->set_termios(uport, &termios, NULL);
+		if (termios.c_cflag)
+			uport->ops->set_termios(uport, &termios, NULL);
 		if (console_suspend_enabled)
 			console_start(uport->cons);
 	}
@@ -2028,6 +2038,7 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 	case UPIO_MEM32:
 	case UPIO_AU:
 	case UPIO_TSI:
+	case UPIO_DWAPB:
 		snprintf(address, sizeof(address),
 			 "MMIO 0x%llx", (unsigned long long)port->mapbase);
 		break;

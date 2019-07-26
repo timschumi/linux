@@ -43,6 +43,9 @@
 #define MIGRATE_ISOLATE       4 /* can't allocate from here */
 #define MIGRATE_TYPES         5
 
+#define is_migrate_cma(migratetype) false
+#define cma_wmark_pages(zone) 0
+
 #define for_each_migratetype_order(order, type) \
 	for (order = 0; order < MAX_ORDER; order++) \
 		for (type = 0; type < MIGRATE_TYPES; type++)
@@ -139,6 +142,10 @@ enum lru_list {
 	LRU_UNEVICTABLE,
 	NR_LRU_LISTS
 };
+
+#define is_migrate_cma(migratetype) false
+#define cma_wmark_pages(zone) 0
+#define NR_LRU_LISTS_CMA	(NR_LRU_LISTS)
 
 #define for_each_lru(lru) for (lru = 0; lru < NR_LRU_LISTS; lru++)
 

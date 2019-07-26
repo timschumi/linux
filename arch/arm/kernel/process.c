@@ -232,6 +232,12 @@ static void default_idle(void)
 void (*pm_idle)(void) = default_idle;
 EXPORT_SYMBOL(pm_idle);
 
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+#ifndef CONFIG_ZRAM_FOR_RTCC2
+extern void could_cswap(void);
+#endif /* CONFIG_ZRAM_FOR_RTCC2 */
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
+
 /*
  * The idle thread, has rather strange semantics for calling pm_idle,
  * but this is what x86 does and we need to do the same, so that
@@ -252,7 +258,11 @@ void cpu_idle(void)
 			if (cpu_is_offline(smp_processor_id()))
 				cpu_die();
 #endif
-
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+#ifndef CONFIG_ZRAM_FOR_RTCC2
+			could_cswap();
+#endif /* CONFIG_ZRAM_FOR_RTCC2 */
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 			/*
 			 * We need to disable interrupts here
 			 * to ensure we don't miss a wakeup call.
@@ -297,6 +307,15 @@ __setup("reboot=", reboot_setup);
 void machine_shutdown(void)
 {
 #ifdef CONFIG_SMP
+	/*
+	 * Disable preemption so we're guaranteed to
+	 * run to power off or reboot and prevent
+	 * the possibility of switching to another
+	 * thread that might wind up blocking on
+	 * one of the stopped CPUs.
+	 */
+	preempt_disable();
+
 	smp_send_stop();
 #endif
 }
@@ -304,6 +323,7 @@ void machine_shutdown(void)
 void machine_halt(void)
 {
 	machine_shutdown();
+	local_irq_disable();
 	while (1);
 }
 
@@ -329,6 +349,7 @@ void machine_restart(char *cmd)
 
 	/* Whoops - the platform was unable to reboot. Tell the user! */
 	printk("Reboot failed -- System halted\n");
+	local_irq_disable();
 	while (1);
 }
 

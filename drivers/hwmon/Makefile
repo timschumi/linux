@@ -126,8 +126,12 @@ obj-$(CONFIG_SENSORS_W83L785TS)	+= w83l785ts.o
 obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l786ng.o
 obj-$(CONFIG_SENSORS_WM831X)	+= wm831x-hwmon.o
 obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
+ifeq ($(CONFIG_MFD_BCM_PMU59xxx),y)
+ifeq ($(CONFIG_CHARGER_BCMPMU_SPA), y)
+obj-$(CONFIG_SENSORS_BCMPMU)    += bcmpmu59xxx-pb-hwmon.o
+endif
+endif
 
 obj-$(CONFIG_PMBUS)		+= pmbus/
-
 ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
 

@@ -364,6 +364,10 @@ static struct usb_gadget_strings *rndis_strings[] = {
 	NULL,
 };
 
+#ifdef CONFIG_USB_ETH_SKB_ALLOC_OPTIMIZATION
+#define DMA_ALIGN_ROOM 4
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 static struct sk_buff *rndis_add_header(struct gether *port,
@@ -371,7 +375,11 @@ static struct sk_buff *rndis_add_header(struct gether *port,
 {
 	struct sk_buff *skb2;
 
-	skb2 = skb_realloc_headroom(skb, sizeof(struct rndis_packet_msg_type));
+	skb2 = skb_realloc_headroom(skb, sizeof(struct rndis_packet_msg_type)
+#ifdef CONFIG_USB_ETH_SKB_ALLOC_OPTIMIZATION
+		+ DMA_ALIGN_ROOM
+#endif
+	);
 	if (skb2)
 		rndis_add_hdr(skb2);
 
@@ -447,13 +455,20 @@ static void rndis_response_complete(struct usb_ep *ep, struct usb_request *req)
 static void rndis_command_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_rndis			*rndis = req->context;
-	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
+	struct usb_composite_dev	*cdev = NULL;
 	int				status;
+
+	/* In usb plug in/out regression tests, port.func.config */
+	/* may be NULL pointer.*/
+	if (rndis->port.func.config != NULL)
+		cdev = rndis->port.func.config->cdev;
+	else
+		printk(KERN_ERR "rndis gadget driver is removed.\n");
 
 	/* received RNDIS command from USB_CDC_SEND_ENCAPSULATED_COMMAND */
 //	spin_lock(&dev->lock);
 	status = rndis_msg_parser(rndis->config, (u8 *) req->buf);
-	if (status < 0)
+	if ((status < 0) && (cdev != NULL))
 		ERROR(cdev, "RNDIS command error %d, %d/%d\n",
 			status, req->actual, req->length);
 //	spin_unlock(&dev->lock);

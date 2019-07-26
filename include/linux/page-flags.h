@@ -274,6 +274,10 @@ PAGEFLAG_FALSE(HWPoison)
 #define __PG_HWPOISON 0
 #endif
 
+PAGEFLAG_FALSE(Cma)
+SETPAGEFLAG_NOOP(Cma)
+CLEARPAGEFLAG_NOOP(Cma)
+
 u64 stable_page_flags(struct page *page);
 
 static inline int PageUptodate(struct page *page)

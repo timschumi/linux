@@ -80,7 +80,11 @@ obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
 obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 obj-$(CONFIG_VIDEO_S5K6AA)	+= s5k6aa.o
 obj-$(CONFIG_VIDEO_ADP1653)	+= adp1653.o
+obj-$(CONFIG_VIDEO_AS3643)      += as3643.o
+obj-$(CONFIG_GPIO_FLASH)      += flash_gpio.o
 obj-$(CONFIG_VIDEO_AS3645A)	+= as3645a.o
+obj-$(CONFIG_VIDEO_A3907)	+= a3907.o
+obj-$(CONFIG_VIDEO_DW9714)	+= dw9714.o
 
 obj-$(CONFIG_SOC_CAMERA_IMX074)		+= imx074.o
 obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
@@ -96,7 +100,8 @@ obj-$(CONFIG_SOC_CAMERA_OV9640)		+= ov9640.o
 obj-$(CONFIG_SOC_CAMERA_OV9740)		+= ov9740.o
 obj-$(CONFIG_SOC_CAMERA_RJ54N1)		+= rj54n1cb0c.o
 obj-$(CONFIG_SOC_CAMERA_TW9910)		+= tw9910.o
-
+obj-$(CONFIG_SOC_CAMERA_S5K4ECGX)	+= camdrv_ss.o  camdrv_ss_s5k4ecgx.o
+obj-$(CONFIG_SOC_CAMERA_SR030PC50)	+= camdrv_ss_sr030pc50.o
 # And now the v4l2 drivers:
 
 obj-$(CONFIG_VIDEO_BT848) += bt8xx/
@@ -133,6 +138,7 @@ obj-$(CONFIG_VIDEOBUF2_CORE)		+= videobuf2-core.o
 obj-$(CONFIG_VIDEOBUF2_MEMOPS)		+= videobuf2-memops.o
 obj-$(CONFIG_VIDEOBUF2_VMALLOC)		+= videobuf2-vmalloc.o
 obj-$(CONFIG_VIDEOBUF2_DMA_CONTIG)	+= videobuf2-dma-contig.o
+obj-$(CONFIG_VIDEOBUF2_DMA_RESERVED)	+= videobuf2-dma-reserved.o
 obj-$(CONFIG_VIDEOBUF2_DMA_SG)		+= videobuf2-dma-sg.o
 
 obj-$(CONFIG_V4L2_MEM2MEM_DEV) += v4l2-mem2mem.o
@@ -147,6 +153,8 @@ obj-$(CONFIG_VIDEO_MMP_CAMERA) += marvell-ccic/
 obj-$(CONFIG_VIDEO_VIA_CAMERA) += via-camera.o
 
 obj-$(CONFIG_VIDEO_OMAP3)	+= omap3isp/
+
+obj-$(CONFIG_VIDEO_KONA)	+=	kona/
 
 obj-$(CONFIG_USB_ZR364XX)       += zr364xx.o
 obj-$(CONFIG_USB_STKWEBCAM)     += stkwebcam.o
@@ -191,6 +199,10 @@ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_MFC)	+= s5p-mfc/
 obj-$(CONFIG_VIDEO_SAMSUNG_S5P_TV)	+= s5p-tv/
 
 obj-$(CONFIG_VIDEO_SAMSUNG_S5P_G2D)	+= s5p-g2d/
+
+obj-$(CONFIG_VIDEO_UNICAM_CAMERA_USE_CSL)		+= unicam_camera_csl.o
+obj-$(CONFIG_VIDEO_UNICAM_CAMERA_USE_CSL_RESERVED)	+= unicam_camera_csl.o
+obj-$(CONFIG_VIDEO_UNICAM_CAMERA_USE_MM_CSI0)		+= unicam_camera.o mm_csi0.o
 
 obj-$(CONFIG_BLACKFIN)                  += blackfin/
 

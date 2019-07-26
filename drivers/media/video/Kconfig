@@ -2,6 +2,46 @@
 # Generic video config states
 #
 
+config FLASH_ENABLE
+	bool "Support for Flash Feature"
+	default n
+	help
+	Support for the Flash Feature.
+	This flag needs to be enabled
+	for the flash feature.
+
+	Enable this flag if camera
+	FLASH is implemented and FLASH
+	IC is presented.
+
+config FLASH_MIC2871
+	bool "Support for Flash IC MIC2871"
+	default n
+	help
+	Support for the Flash MIC2871.
+	If the flash IC is MIC2871, Enable
+	this flag.
+
+	Enable this flag if the flash IC
+	is MIC2871.
+
+config FLASH_RT8547
+	bool "Support for Flash IC RT8547"
+	default n
+	help
+	Support for the Flash RT8547.
+	If the flash IC is RT8547, Enable
+	this flag.
+
+	Enable this flag if the flash IC
+	is RT8547.
+
+config FLASH_DS8515
+	bool "Support Broadcom Hawaii Golden for Flash Implementation"
+	default n
+	help
+	Support for the Broadcom Hawaii Golden Enable this flag if camera flash IC used is DS8515.
+
 config VIDEO_V4L2
 	tristate
 	depends on VIDEO_DEV && VIDEO_V4L2_COMMON
@@ -66,6 +106,16 @@ config VIDEOBUF2_DMA_SG
 	select VIDEOBUF2_CORE
 	select VIDEOBUF2_MEMOPS
 	tristate
+
+config VIDEOBUF2_DMA_RESERVED
+	select VIDEOBUF2_CORE
+	select VIDEOBUF2_MEMOPS
+	tristate
+	
+config LATIN_CAMERA_FLICKER_60HZ
+	bool "Camera Flicker fix 60Hz"
+	default n
+
 #
 # Multimedia Video device configuration
 #
@@ -560,10 +610,45 @@ comment "Flash devices"
 
 config VIDEO_ADP1653
 	tristate "ADP1653 flash support"
-	depends on I2C && VIDEO_V4L2 && MEDIA_CONTROLLER
+	depends on I2C && VIDEO_V4L2
 	---help---
 	  This is a driver for the ADP1653 flash controller. It is used for
 	  example in Nokia N900.
+
+config VIDEO_AS3643
+    tristate "AS3643 flash support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This is a driver for the AS3643 flash controller.
+
+config GPIO_FLASH
+    tristate "gpio flash support"
+    depends on VIDEO_V4L2
+    ---help---
+      This is a driver for the gpio flash controller.
+      This is a flash driver ic.
+      This is a driver for the gpio flash controller.
+      This is a flash driver ic.
+      This is a driver for the gpio flash controller.
+      This is a flash driver ic.
+
+config VIDEO_A3907
+    tristate "A3907 flash support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This is a driver for the A3907 controller.
+      The Allegro A3907 is a coil motor driver for linear
+      control of small form factor voice coil motors.
+      It is used with the OV5648 as a camera focus motor.
+
+config VIDEO_DW9714
+    tristate "DW9714 flash support"
+    depends on I2C && VIDEO_V4L2
+    ---help---
+      This is a driver for the DW9714 controller.
+      The Allegro DW9714 is a coil motor driver for linear
+      control of small form factor voice coil motors.
+      It is used with the OV5648 as a camera focus motor.
 
 config VIDEO_AS3645A
 	tristate "AS3645A flash driver support"
@@ -953,6 +1038,16 @@ config VIDEO_OMAP3_DEBUG
 	---help---
 	  Enable debug messages on OMAP 3 camera controller driver.
 
+config VIDEO_KONA
+	tristate "Camera Support for Broadcom KONA platform"
+	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_KONA && EXPERIMENTAL
+	select VIDEOBUF2_DMA_CONTIG
+	select KONA_CSL_CAMERA
+	select KONA_CHAL_CAMERA
+	help
+	  Driver for KONA UNICAM controller.This driver uses media controller
+	  framework instead of soc camera.
+
 config SOC_CAMERA
 	tristate "SoC camera support"
 	depends on VIDEO_V4L2 && HAS_DMA && I2C
@@ -983,6 +1078,13 @@ config SOC_CAMERA_MT9M111
 	help
 	  This driver supports MT9M111, MT9M112 and MT9M131 cameras from
 	  Micron/Aptina
+
+config SOC_SUB_CAMERA
+	tristate "sub camera enabled"
+	depends on SOC_CAMERA && I2C
+	help
+	  This enables sub camera.
+
 
 config SOC_CAMERA_MT9T031
 	tristate "mt9t031 support"
@@ -1027,11 +1129,17 @@ config SOC_CAMERA_OV2640
 	help
 	  This is a ov2640 camera driver
 
-config SOC_CAMERA_OV5642
-	tristate "ov5642 camera support"
+config SOC_CAMERA_S5K4ECGX
+	tristate "s5k4ecgx camera support"
 	depends on SOC_CAMERA && I2C
 	help
-	  This is a V4L2 camera driver for the OmniVision OV5642 sensor
+	  This is a s5k4ecgx camera driver
+
+config SOC_CAMERA_SR030PC50
+	tristate "sr030pc50 camera support"
+	depends on SOC_CAMERA && I2C
+	help
+	  This is a sr030pc50 camera driver
 
 config SOC_CAMERA_OV6650
 	tristate "ov6650 sensor support"
@@ -1157,6 +1265,43 @@ config VIDEO_S5P_MIPI_CSIS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called s5p-csis.
+
+config VIDEO_UNICAM_CAMERA
+	tristate "Broadcom Unicam camera host interface driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
+	---help---
+	  This is a v4l2 driver for Broadcom Unicam host interface.
+
+	  To compile this driver as a modulem choose M here: the
+	  module will be called unicam_camera
+
+config VIDEO_UNICAM_CAMERA_USE_CSL_RESERVED
+	tristate "Broadcom Unicam camera CSL driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && VIDEO_UNICAM_CAMERA
+	select VIDEOBUF2_DMA_RESERVED
+	select KONA_CSL_CAMERA
+	select KONA_CHAL_CAMERA
+	---help---
+		This enables the camera CSL and CHAL drivers
+		to be used by UNICAM driver with IOMMU
+
+config VIDEO_UNICAM_CAMERA_USE_CSL
+	tristate "Broadcom Unicam camera CSL driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && VIDEO_UNICAM_CAMERA
+	select VIDEOBUF2_DMA_CONTIG
+	select KONA_CSL_CAMERA
+	select KONA_CHAL_CAMERA
+	---help---
+		This enables the camera CSL and CHAL drivers
+		to be used by UNICAM driver without IOMMU
+
+config VIDEO_UNICAM_CAMERA_USE_MM_CSI0
+	tristate "Broadcom Unicam camera MM CSI0 driver"
+	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && !VIDEO_UNICAM_CAMERA_USE_CSL && VIDEO_UNICAM_CAMERA
+	select VIDEOBUF2_DMA_RESERVED
+	---help---
+		This enables the camera MM_CSI0 drivers
+		to be used by UNICAM driver
 
 source "drivers/media/video/s5p-tv/Kconfig"
 

@@ -151,6 +151,7 @@ dtb-$(CONFIG_ARCH_BCM_HR2) += \
 dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
 	bcm28155-ap.dtb \
 	bcm21664-garnet.dtb \
+	bcm21664-hawaii.dtb \
 	bcm23550-sparrow.dtb
 dtb-$(CONFIG_ARCH_BCM_NSP) += \
 	bcm958522er.dtb \

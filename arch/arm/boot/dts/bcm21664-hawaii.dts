@@ -1,0 +1,37 @@
+/*
+ * Copyright (C) 2014 Broadcom Corporation
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation version 2.
+ *
+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+ * kind, whether express or implied; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+
+#include "bcm21664.dtsi"
+
+/ {
+	model = "BCM21664 Hawaii board";
+	compatible = "brcm,bcm21664-hawaii", "brcm,bcm21664";
+
+	chosen {
+		bootargs = "mem=736M earlycon earlyprintk=serial,ttyS0,115200n8 console=ttyS0,115200n8";
+		stdout-path = "/uart@3e002000:115200b8";
+	};
+
+	memory@82000000 {
+		device_type = "memory";
+		reg = <0x82000000 0x2e000000>; /* 736 MB */
+	};
+
+	uart@3e002000 {
+		status = "okay";
+	};
+};

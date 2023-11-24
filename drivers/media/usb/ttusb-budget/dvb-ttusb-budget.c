@@ -282,10 +282,8 @@ static int ttusb_boot_dsp(struct ttusb *ttusb)
 
 	err = request_firmware(&fw, "ttusb-budget/dspbootcode.bin",
 			       &ttusb->dev->dev);
-	if (err) {
-		pr_err("failed to request firmware\n");
+	if (err)
 		return err;
-	}
 
 	/* BootBlock */
 	b[0] = 0xaa;

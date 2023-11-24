@@ -56,14 +56,25 @@ config INTEL_IOMMU_SVM
 	  to access DMA resources through process address space by
 	  means of a Process Address Space ID (PASID).
 
-config INTEL_IOMMU_DEFAULT_ON
-	bool "Enable Intel DMA Remapping Devices by default"
-	default y
+choice
+	prompt "Default state of Intel DMA Remapping Devices"
+	default INTEL_IOMMU_DEFAULT_ON
 	help
-	  Selecting this option will enable a DMAR device at boot time if
-	  one is found. If this option is not selected, DMAR support can
-	  be enabled by passing intel_iommu=on to the kernel.
+	  Choose whether Intel DMA Remapping Devices should be enabled
+	  by default. This can be overridden at boot time using the
+	  intel_iommu= kernel parameter.
 
+config INTEL_IOMMU_DEFAULT_ON
+	bool "Enable"
+
+config INTEL_IOMMU_DEFAULT_ON_INTGPU_OFF
+	bool "Enable, excluding integrated GPU"
+
+config INTEL_IOMMU_DEFAULT_OFF
+	bool "Disable"
+
+endchoice
+ 
 config INTEL_IOMMU_BROKEN_GFX_WA
 	bool "Workaround broken graphics drivers (going away soon)"
 	depends on BROKEN && X86

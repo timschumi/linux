@@ -36,10 +36,8 @@ enum TRI_STATE {
 
 #define COMP_ENTRY_SIZE 64
 
-#define ADAPTER_MTU_SIZE 1500
-#define MAX_FRAME_SIZE (ADAPTER_MTU_SIZE + 14)
-
 #define RX_BUFFERS_PER_QUEUE 512
+#define MANA_RX_DATA_ALIGN 64
 
 #define MAX_SEND_BUFFERS_PER_QUEUE 256
 
@@ -47,6 +45,10 @@ enum TRI_STATE {
 #define LOG2_EQ_THROTTLE 3
 
 #define MAX_PORTS_IN_MANA_DEV 256
+
+/* Update this count whenever the respective structures are changed */
+#define MANA_STATS_RX_COUNT 5
+#define MANA_STATS_TX_COUNT 11
 
 struct mana_stats_rx {
 	u64 packets;
@@ -61,6 +63,14 @@ struct mana_stats_tx {
 	u64 packets;
 	u64 bytes;
 	u64 xdp_xmit;
+	u64 tso_packets;
+	u64 tso_bytes;
+	u64 tso_inner_packets;
+	u64 tso_inner_bytes;
+	u64 short_pkt_fmt;
+	u64 long_pkt_fmt;
+	u64 csum_partial;
+	u64 mana_map_err;
 	struct u64_stats_sync syncp;
 };
 
@@ -265,18 +275,15 @@ struct mana_cq {
 	int budget;
 };
 
-#define GDMA_MAX_RQE_SGES 15
-
 struct mana_recv_buf_oob {
 	/* A valid GDMA work request representing the data buffer. */
 	struct gdma_wqe_request wqe_req;
 
 	void *buf_va;
-	dma_addr_t buf_dma_addr;
 
 	/* SGL of the buffer going to be sent has part of the work request. */
 	u32 num_sge;
-	struct gdma_sge sgl[GDMA_MAX_RQE_SGES];
+	struct gdma_sge sgl[MAX_RX_WQE_SGL_ENTRIES];
 
 	/* Required to store the result of mana_gd_post_work_request.
 	 * gdma_posted_wqe_info.wqe_size_in_bu is required for progressing the
@@ -284,6 +291,11 @@ struct mana_recv_buf_oob {
 	 */
 	struct gdma_posted_wqe_info wqe_inf;
 };
+
+#define MANA_RXBUF_PAD (SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) \
+			+ ETH_HLEN)
+
+#define MANA_XDP_MTU_MAX (PAGE_SIZE - MANA_RXBUF_PAD - XDP_PACKET_HEADROOM)
 
 struct mana_rxq {
 	struct gdma_queue *gdma_rq;
@@ -294,6 +306,8 @@ struct mana_rxq {
 	u32 rxq_idx;
 
 	u32 datasize;
+	u32 alloc_size;
+	u32 headroom;
 
 	mana_handle_t rxobj;
 
@@ -312,7 +326,7 @@ struct mana_rxq {
 
 	struct bpf_prog __rcu *bpf_prog;
 	struct xdp_rxq_info xdp_rxq;
-	struct page *xdp_save_page;
+	void *xdp_save_va; /* for reusing */
 	bool xdp_flush;
 	int xdp_rc; /* XDP redirect return code */
 
@@ -333,6 +347,17 @@ struct mana_tx_qp {
 struct mana_ethtool_stats {
 	u64 stop_queue;
 	u64 wake_queue;
+	u64 hc_tx_bytes;
+	u64 hc_tx_ucast_pkts;
+	u64 hc_tx_ucast_bytes;
+	u64 hc_tx_bcast_pkts;
+	u64 hc_tx_bcast_bytes;
+	u64 hc_tx_mcast_pkts;
+	u64 hc_tx_mcast_bytes;
+	u64 tx_cqe_err;
+	u64 tx_cqe_unknown_type;
+	u64 rx_coalesced_err;
+	u64 rx_cqe_unknown_type;
 };
 
 struct mana_context {
@@ -371,6 +396,14 @@ struct mana_port_context {
 	/* This points to an array of num_queues of RQ pointers. */
 	struct mana_rxq **rxqs;
 
+	/* pre-allocated rx buffer array */
+	void **rxbufs_pre;
+	dma_addr_t *das_pre;
+	int rxbpre_total;
+	u32 rxbpre_datasize;
+	u32 rxbpre_alloc_size;
+	u32 rxbpre_headroom;
+
 	struct bpf_prog *bpf_prog;
 
 	/* Create num_queues EQs, SQs, SQ-CQs, RQs and RQ-CQs, respectively. */
@@ -380,6 +413,10 @@ struct mana_port_context {
 	mana_handle_t port_handle;
 	mana_handle_t pf_filter_handle;
 
+	/* Mutex for sharing access to vport_use_count */
+	struct mutex vport_mutex;
+	int vport_use_count;
+
 	u16 port_idx;
 
 	bool port_is_up;
@@ -388,7 +425,7 @@ struct mana_port_context {
 	struct mana_ethtool_stats eth_stats;
 };
 
-int mana_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+netdev_tx_t mana_start_xmit(struct sk_buff *skb, struct net_device *ndev);
 int mana_config_rss(struct mana_port_context *ac, enum TRI_STATE rx,
 		    bool update_hash, bool update_tab);
 
@@ -407,6 +444,7 @@ u32 mana_run_xdp(struct net_device *ndev, struct mana_rxq *rxq,
 struct bpf_prog *mana_xdp_get(struct mana_port_context *apc);
 void mana_chn_setxdp(struct mana_port_context *apc, struct bpf_prog *prog);
 int mana_bpf(struct net_device *ndev, struct netdev_bpf *bpf);
+void mana_query_gf_stats(struct mana_port_context *apc);
 
 extern const struct ethtool_ops mana_ethtool_ops;
 
@@ -463,6 +501,11 @@ struct mana_query_device_cfg_resp {
 	u16 max_num_vports;
 	u16 reserved;
 	u32 max_num_eqs;
+
+	/* response v2: */
+	u16 adapter_mtu;
+	u16 reserved2;
+	u32 reserved3;
 }; /* HW DATA */
 
 /* Query vPort Configuration */
@@ -540,8 +583,51 @@ struct mana_fence_rq_resp {
 	struct gdma_resp_hdr hdr;
 }; /* HW DATA */
 
+/* Query stats RQ */
+struct mana_query_gf_stat_req {
+	struct gdma_req_hdr hdr;
+	u64 req_stats;
+}; /* HW DATA */
+
+struct mana_query_gf_stat_resp {
+	struct gdma_resp_hdr hdr;
+	u64 reported_stats;
+	/* rx errors/discards */
+	u64 discard_rx_nowqe;
+	u64 err_rx_vport_disabled;
+	/* rx bytes/packets */
+	u64 hc_rx_bytes;
+	u64 hc_rx_ucast_pkts;
+	u64 hc_rx_ucast_bytes;
+	u64 hc_rx_bcast_pkts;
+	u64 hc_rx_bcast_bytes;
+	u64 hc_rx_mcast_pkts;
+	u64 hc_rx_mcast_bytes;
+	/* tx errors */
+	u64 err_tx_gf_disabled;
+	u64 err_tx_vport_disabled;
+	u64 err_tx_inval_vport_offset_pkt;
+	u64 err_tx_vlan_enforcement;
+	u64 err_tx_ethtype_enforcement;
+	u64 err_tx_SA_enforecement;
+	u64 err_tx_SQPDID_enforcement;
+	u64 err_tx_CQPDID_enforcement;
+	u64 err_tx_mtu_violation;
+	u64 err_tx_inval_oob;
+	/* tx bytes/packets */
+	u64 hc_tx_bytes;
+	u64 hc_tx_ucast_pkts;
+	u64 hc_tx_ucast_bytes;
+	u64 hc_tx_bcast_pkts;
+	u64 hc_tx_bcast_bytes;
+	u64 hc_tx_mcast_pkts;
+	u64 hc_tx_mcast_bytes;
+	/* tx error */
+	u64 err_tx_gdma;
+}; /* HW DATA */
+
 /* Configure vPort Rx Steering */
-struct mana_cfg_rx_steer_req {
+struct mana_cfg_rx_steer_req_v2 {
 	struct gdma_req_hdr hdr;
 	mana_handle_t vport;
 	u16 num_indir_entries;
@@ -554,6 +640,8 @@ struct mana_cfg_rx_steer_req {
 	u8 reserved;
 	mana_handle_t default_rxobj;
 	u8 hashkey[MANA_HASH_KEY_SIZE];
+	u8 cqe_coalescing_enable;
+	u8 reserved2[7];
 }; /* HW DATA */
 
 struct mana_cfg_rx_steer_resp {
@@ -617,6 +705,42 @@ struct mana_deregister_filter_resp {
 	struct gdma_resp_hdr hdr;
 }; /* HW DATA */
 
+/* Requested GF stats Flags */
+/* Rx discards/Errors */
+#define STATISTICS_FLAGS_RX_DISCARDS_NO_WQE		0x0000000000000001
+#define STATISTICS_FLAGS_RX_ERRORS_VPORT_DISABLED	0x0000000000000002
+/* Rx bytes/pkts */
+#define STATISTICS_FLAGS_HC_RX_BYTES			0x0000000000000004
+#define STATISTICS_FLAGS_HC_RX_UCAST_PACKETS		0x0000000000000008
+#define STATISTICS_FLAGS_HC_RX_UCAST_BYTES		0x0000000000000010
+#define STATISTICS_FLAGS_HC_RX_MCAST_PACKETS		0x0000000000000020
+#define STATISTICS_FLAGS_HC_RX_MCAST_BYTES		0x0000000000000040
+#define STATISTICS_FLAGS_HC_RX_BCAST_PACKETS		0x0000000000000080
+#define STATISTICS_FLAGS_HC_RX_BCAST_BYTES		0x0000000000000100
+/* Tx errors */
+#define STATISTICS_FLAGS_TX_ERRORS_GF_DISABLED		0x0000000000000200
+#define STATISTICS_FLAGS_TX_ERRORS_VPORT_DISABLED	0x0000000000000400
+#define STATISTICS_FLAGS_TX_ERRORS_INVAL_VPORT_OFFSET_PACKETS		\
+							0x0000000000000800
+#define STATISTICS_FLAGS_TX_ERRORS_VLAN_ENFORCEMENT	0x0000000000001000
+#define STATISTICS_FLAGS_TX_ERRORS_ETH_TYPE_ENFORCEMENT			\
+							0x0000000000002000
+#define STATISTICS_FLAGS_TX_ERRORS_SA_ENFORCEMENT	0x0000000000004000
+#define STATISTICS_FLAGS_TX_ERRORS_SQPDID_ENFORCEMENT	0x0000000000008000
+#define STATISTICS_FLAGS_TX_ERRORS_CQPDID_ENFORCEMENT	0x0000000000010000
+#define STATISTICS_FLAGS_TX_ERRORS_MTU_VIOLATION	0x0000000000020000
+#define STATISTICS_FLAGS_TX_ERRORS_INVALID_OOB		0x0000000000040000
+/* Tx bytes/pkts */
+#define STATISTICS_FLAGS_HC_TX_BYTES			0x0000000000080000
+#define STATISTICS_FLAGS_HC_TX_UCAST_PACKETS		0x0000000000100000
+#define STATISTICS_FLAGS_HC_TX_UCAST_BYTES		0x0000000000200000
+#define STATISTICS_FLAGS_HC_TX_MCAST_PACKETS		0x0000000000400000
+#define STATISTICS_FLAGS_HC_TX_MCAST_BYTES		0x0000000000800000
+#define STATISTICS_FLAGS_HC_TX_BCAST_PACKETS		0x0000000001000000
+#define STATISTICS_FLAGS_HC_TX_BCAST_BYTES		0x0000000002000000
+/* Tx error */
+#define STATISTICS_FLAGS_TX_ERRORS_GDMA_ERROR		0x0000000004000000
+
 #define MANA_MAX_NUM_QUEUES 64
 
 #define MANA_SHORT_VPORT_OFFSET_MAX ((1U << 8) - 1)
@@ -631,4 +755,16 @@ struct mana_tx_package {
 	struct gdma_posted_wqe_info wqe_info;
 };
 
+int mana_create_wq_obj(struct mana_port_context *apc,
+		       mana_handle_t vport,
+		       u32 wq_type, struct mana_obj_spec *wq_spec,
+		       struct mana_obj_spec *cq_spec,
+		       mana_handle_t *wq_obj);
+
+void mana_destroy_wq_obj(struct mana_port_context *apc, u32 wq_type,
+			 mana_handle_t wq_obj);
+
+int mana_cfg_vport(struct mana_port_context *apc, u32 protection_dom_id,
+		   u32 doorbell_pg_id);
+void mana_uncfg_vport(struct mana_port_context *apc);
 #endif /* _MANA_H */

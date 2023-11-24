@@ -135,7 +135,7 @@ static int fw_load_from_user_helper(struct firmware *firmware,
 	if (opt_flags & FW_OPT_NOWAIT) {
 		timeout = usermodehelper_read_lock_wait(timeout);
 		if (!timeout) {
-			dev_dbg(device, "firmware: %s loading timed out\n",
+			dev_err(device, "firmware: %s loading timed out\n",
 				name);
 			return -EBUSY;
 		}

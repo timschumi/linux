@@ -2445,10 +2445,8 @@ gf100_gr_load_fw(struct gf100_gr *gr, const char *name,
 	if (ret) {
 		snprintf(f, sizeof(f), "nouveau/%s", name);
 		ret = request_firmware(&fw, f, device->dev);
-		if (ret) {
-			nvkm_error(subdev, "failed to load %s\n", name);
+		if (ret)
 			return ret;
-		}
 	}
 
 	blob->size = fw->size;

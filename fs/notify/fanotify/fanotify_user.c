@@ -1675,6 +1675,14 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 		umask = FANOTIFY_EVENT_FLAGS;
 	}
 
+#ifdef CONFIG_FANOTIFY_ACCESS_PERMISSIONS
+	if (mask & FANOTIFY_PERM_EVENTS) {
+		pr_warn_once("%s (%d): Using fanotify permission checks may lead to deadlock; tainting kernel\n",
+			     current->comm, current->pid);
+		add_taint(TAINT_AUX, LOCKDEP_STILL_OK);
+	}
+#endif
+
 	f = fdget(fanotify_fd);
 	if (unlikely(!f.file))
 		return -EBADF;

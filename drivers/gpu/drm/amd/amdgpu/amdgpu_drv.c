@@ -39,6 +39,8 @@
 #include <linux/cc_platform.h>
 #include <linux/fb.h>
 #include <linux/dynamic_debug.h>
+#include <linux/namei.h>
+#include <linux/path.h>
 
 #include "amdgpu.h"
 #include "amdgpu_irq.h"
@@ -2051,6 +2053,28 @@ static void amdgpu_get_secondary_funcs(struct amdgpu_device *adev)
 	}
 }
 
+/* Test that /lib/firmware/amdgpu is a directory (or symlink to a
+ * directory).  We could try to match the udev search path, but let's
+ * keep it simple.
+ */
+static bool amdgpu_firmware_installed(void)
+{
+#if IS_BUILTIN(CONFIG_DRM_AMDGPU)
+	/* It may be too early to tell.  Assume it's there. */
+	return true;
+#else
+	struct path path;
+
+	if (kern_path("/lib/firmware/amdgpu", LOOKUP_DIRECTORY | LOOKUP_FOLLOW,
+		      &path) == 0) {
+		path_put(&path);
+		return true;
+	}
+
+	return false;
+#endif
+}
+
 static int amdgpu_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
@@ -2133,6 +2157,12 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 		}
 	}
 #endif
+
+	if (!amdgpu_firmware_installed()) {
+		DRM_ERROR("amdgpu requires firmware installed\n");
+		pr_err_once("See https://wiki.debian.org/Firmware for information about missing firmware\n");
+		return -ENODEV;
+	}
 
 	adev = devm_drm_dev_alloc(&pdev->dev, &amdgpu_kms_driver, typeof(*adev), ddev);
 	if (IS_ERR(adev))

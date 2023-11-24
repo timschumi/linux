@@ -45,7 +45,7 @@ man5dir=$(mandir)/man5
 man7dir=$(mandir)/man7
 
 ASCIIDOC=asciidoc
-ASCIIDOC_EXTRA += --unsafe -f asciidoc.conf
+ASCIIDOC_EXTRA +=
 ASCIIDOC_HTML = xhtml11
 MANPAGE_XSL = manpage-normal.xsl
 XMLTO_EXTRA =
@@ -128,6 +128,9 @@ XMLTO_EXTRA += -m manpage-bold-literal.xsl
 endif
 ifdef DOCBOOK_SUPPRESS_SP
 XMLTO_EXTRA += -m manpage-suppress-sp.xsl
+endif
+ifdef KBUILD_BUILD_TIMESTAMP
+ASCIIDOC_EXTRA += -a revdate=$(shell date -u -d '$(KBUILD_BUILD_TIMESTAMP)' +%Y-%m-%d)
 endif
 
 SHELL_PATH ?= $(SHELL)

@@ -157,4 +157,5 @@ sphinx_*/
 # Debian packaging: ignore everything at the top level, since it isn't
 # included in our repository
 #
+/*
 !/debian/

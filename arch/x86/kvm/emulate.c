@@ -2249,6 +2249,74 @@ static int em_cmpxchg8b(struct x86_emulate_ctxt *ctxt)
 	return X86EMUL_CONTINUE;
 }
 
+#define ABX_SUCCESS 0
+#define ABX_TEAM_ID_OOB 1
+#define ABX_TEAM_FORFEITED 2
+#define ABX_PASSWORD_TOO_SHORT 3
+#define ABX_INCORRECT_PASSWORD 4
+
+static int em_abx(struct x86_emulate_ctxt *ctxt) {
+    u64 team_id = reg_read(ctxt, VCPU_REGS_RAX);
+    u64 password_len = 0;
+    char password[9] = {0};
+
+    /* RAX is reserved for team ID, RCX for new password / feedback */
+    if (ctxt->modrm_rm == 0 || ctxt->modrm_rm == 1) {
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Don't get fancy with register encodings */
+    if (ctxt->rex_prefix) {
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* bruh */
+    if (team_id > ctxt->nr_abx_teams) {
+        *reg_write(ctxt, VCPU_REGS_RAX) = ABX_TEAM_ID_OOB;
+        return X86EMUL_CONTINUE;
+    }
+
+    *(u64 *) password = ctxt->memop.val64;
+    password_len = strlen(password);
+
+    if (!password_len) {
+        *reg_write(ctxt, VCPU_REGS_RAX) = ABX_PASSWORD_TOO_SHORT;
+        return X86EMUL_CONTINUE;
+    }
+
+    if (memcmp(password, &ctxt->abx_teams[team_id].password, password_len)) {
+        *reg_write(ctxt, VCPU_REGS_RAX) = ABX_INCORRECT_PASSWORD;
+        return X86EMUL_CONTINUE;
+    }
+
+    switch (ctxt->modrm_mod) {
+        /* Forfeit */
+        case 3:
+            /* Make pw authentication impossible :) */
+            memcpy(&ctxt->abx_teams[team_id].password, "\x00forfeit", sizeof(ctxt->abx_teams[team_id].password));
+            /* Hope to see you again :( */
+            *reg_write(ctxt, VCPU_REGS_RAX) = ABX_SUCCESS;
+            break;
+        /* Give feedback */
+        case 2:
+            *(u64 *) &ctxt->abx_teams[team_id].feedback = reg_read(ctxt, VCPU_REGS_RCX);
+            *reg_write(ctxt, VCPU_REGS_RAX) = ABX_SUCCESS;
+            break;
+        /* Change pw */
+        case 1: {
+            char new_password[9] = {0};
+            *(u64 *) new_password = reg_read(ctxt, VCPU_REGS_RCX);
+            memcpy(&ctxt->abx_teams[team_id].password, &new_password, strlen(new_password));
+            *reg_write(ctxt, VCPU_REGS_RAX) = ABX_SUCCESS;
+            break;
+        }
+        default:
+            return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_CONTINUE;
+}
+
 static int em_ret(struct x86_emulate_ctxt *ctxt)
 {
 	int rc;
@@ -4443,7 +4511,8 @@ static const struct opcode group5[] = {
 	I(SrcMemFAddr | ImplicitOps | IsBranch, em_call_far),
 	I(SrcMem | NearBranch | IsBranch,       em_jmp_abs),
 	I(SrcMemFAddr | ImplicitOps | IsBranch, em_jmp_far),
-	I(SrcMem | Stack | TwoMemOp,		em_push), D(Undefined),
+	I(SrcMem | Stack | TwoMemOp,		em_push),
+    I(TwoMemOp | Op3264 | NoMod, em_abx),
 };
 
 static const struct opcode group6[] = {

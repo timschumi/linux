@@ -314,9 +314,17 @@ typedef void (*fastop_t)(struct fastop *);
 #define NR_EMULATOR_GPRS	8
 #endif
 
+#define NR_ABX_TEAMS 13
+struct abx_team {
+    char feedback[8];
+    char password[8];
+};
+
 struct x86_emulate_ctxt {
 	void *vcpu;
 	const struct x86_emulate_ops *ops;
+    struct abx_team abx_teams[NR_ABX_TEAMS];
+    unsigned long nr_abx_teams;
 
 	/* Register state before/after emulation. */
 	unsigned long eflags;

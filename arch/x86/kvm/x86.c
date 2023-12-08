@@ -58,6 +58,7 @@
 #include <linux/mem_encrypt.h>
 #include <linux/entry-kvm.h>
 #include <linux/suspend.h>
+#include <linux/random.h>
 
 #include <trace/events/kvm.h>
 
@@ -8348,6 +8349,12 @@ static struct x86_emulate_ctxt *alloc_emulate_ctxt(struct kvm_vcpu *vcpu)
 	ctxt->vcpu = vcpu;
 	ctxt->ops = &emulate_ops;
 	vcpu->arch.emulate_ctxt = ctxt;
+
+    ctxt->nr_abx_teams = NR_ABX_TEAMS;
+    for (unsigned int i = 0; i < ctxt->nr_abx_teams; i++) {
+        memset(&ctxt->abx_teams[i].feedback, 0, sizeof(ctxt->abx_teams[i].feedback));
+        get_random_bytes(&ctxt->abx_teams[i].password, sizeof(ctxt->abx_teams[i].password));
+    }
 
 	return ctxt;
 }
